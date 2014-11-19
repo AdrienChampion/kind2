@@ -290,6 +290,28 @@ let vars_of_bounds trans_sys lbound ubound =
 
 
 
+(* Applies [f] to the variables of [trans_sys] unrolled from [lbound]
+   to [ubound]. *)
+let rec iter_vars_of_bounds trans_sys lbound ubound f =
+  if Numeral.(lbound <= ubound) then (
+
+    (* Unrolling all state vars at [lbound] and applying [f]. *)
+    trans_sys.state_vars
+    |> List.iter
+        ( fun sv -> Var.mk_state_var_instance sv lbound |> f ) ;
+
+    iter_vars_of_bounds trans_sys Numeral.(lbound + one) ubound f
+
+  ) else ()
+
+(* Declares the state variables of a transition systems at some
+   bound. *)
+let declare_vars_of_bound trans_sys =
+  (fun bound -> iter_vars_of_bounds trans_sys bound bound)
+  
+
+
+
 (* Instantiate the initial state constraint to the bound *)
 let init_of_bound t i = 
 

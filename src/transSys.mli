@@ -128,6 +128,17 @@ val get_input : t -> input
    transition system *)
 val vars_of_bounds : t -> Numeral.t -> Numeral.t -> Var.t list
 
+
+(** Applies a function to the variables of a transition system
+    unrolled from a lower bound to an upper bound. *)
+val iter_vars_of_bounds :
+  t -> Numeral.t -> Numeral.t -> (Var.t -> unit) -> unit
+  
+(** Declares the state variables of a transition systems at some
+    bound. *)
+val declare_vars_of_bound :
+  t -> Numeral.t -> (Var.t -> unit) -> unit
+
 (** Instantiate the initial state constraint to the bound *)
 val init_of_bound : t -> Numeral.t -> Term.t
 

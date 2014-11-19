@@ -191,7 +191,12 @@ let split trans solver k to_split actlits =
   let if_unsat () = None in
 
   (* Appending to the list of actlits. *)
-  let all_actlits = path_comp_act_term :: actlits in
+  let all_actlits =
+    if Flags.ind_compress () then
+      path_comp_act_term :: actlits
+    else
+      actlits
+  in
 
   (* Loops as long as counterexamples can be compressed. *)
   let rec loop () = 
@@ -536,9 +541,10 @@ let launch trans =
   solver_ref := Some solver ;
 
   (* Declaring uninterpreted function symbols. *)
-  TransSys.iter_state_var_declarations
-    trans
-    (Solver.declare_fun solver) ;
+  (* TransSys.declare_vars_of_bound *)
+  (*   trans *)
+  (*   Numeral.zero *)
+  (*   (Solver.declare_fun solver) ; *)
 
   (* Declaring positive actlits. *)
   List.iter
@@ -547,11 +553,13 @@ let launch trans =
      |> Solver.declare_fun solver)
     unknowns ;
 
-  (* Declaring path compression actlit. *)
-  path_comp_actlit |> Solver.declare_fun solver ;
 
   (* Declaring path compression function. *)
-  Compress.init (Solver.declare_fun solver) trans ;
+  if Flags.ind_compress () then (
+    (* Declaring path compression actlit. *)
+    path_comp_actlit |> Solver.declare_fun solver ;
+    Compress.init (Solver.declare_fun solver) trans
+  ) ;
 
   (* Defining functions. *)
   TransSys.iter_uf_definitions
