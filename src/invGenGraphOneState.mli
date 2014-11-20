@@ -14,15 +14,13 @@
    implied. See the License for the specific language governing
    permissions and limitations under the License. 
 
-*)
+ *)
 
-(** Parser for a CSV input file 
+(** Clean up before exit. *)
+val on_exit: TransSys.t option -> unit
 
-    @author Baoluo Meng, Christoph Sticksel *)
-
-(** Parse a CSV input file *)
-val read_file: string list -> string -> (StateVar.t * (Term.t list)) list
-
+(** Runs the base instance. *)
+val main: TransSys.t -> unit
 
 (* 
    Local Variables:
@@ -31,3 +29,4 @@ val read_file: string list -> string -> (StateVar.t * (Term.t list)) list
    indent-tabs-mode: nil
    End: 
 *)
+

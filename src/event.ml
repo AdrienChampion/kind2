@@ -94,7 +94,7 @@ let reduce_nodes_to_coi trans_sys nodes prop_name =
   (* Reduce nodes to cone of influence of property *)
   let nodes' = 
     LustreNode.reduce_to_coi 
-      (List.rev nodes)
+      nodes
       main_name
       (StateVar.StateVarSet.elements (Term.state_vars_of_term prop'))
   in
@@ -318,6 +318,7 @@ module MdlMap =
         | `IND -> 2
         | `PDR -> 3
         | `INVGEN -> 4
+        | `INVGENOS -> 5
           
       let compare m1 m2 = 
         compare (int_of_kind_module m1) (int_of_kind_module m2)
@@ -362,6 +363,7 @@ let pt_string_of_kind_module = function
   | `BMC -> "BMC"
   | `IND -> "inductive step"
   | `INVGEN -> "invariant generator"
+  | `INVGENOS -> "one state invariant generator"
   | `INVMAN -> "invariant manager"
   | `Interpreter -> "interpreter"
   | `Parser -> "parser"
@@ -413,10 +415,15 @@ let pp_print_counterexample_pt level trans_sys prop_name ppf = function
     (
 
       (* Distinguish between input formats *)
-      match TransSys.get_input trans_sys with
+      match TransSys.get_source trans_sys with
 
         (* Lustre input *)
         | TransSys.Lustre nodes ->
+
+          debug event
+              "Nodes in transition system: %a"
+              (pp_print_list (fun ppf { LustreNode.name } -> LustreIdent.pp_print_ident false ppf name) "@ ") nodes
+          in
 
           (* Reduce nodes to cone of influence of property *)
           let nodes' = reduce_nodes_to_coi trans_sys nodes prop_name in
@@ -429,10 +436,14 @@ let pp_print_counterexample_pt level trans_sys prop_name ppf = function
         (* Native input *)
         | TransSys.Native ->
 
+          assert false
+
+      (*
           (* Output counterexample *)
           Format.fprintf ppf 
             "Counterexample:@,%a"
             NativeInput.pp_print_path_pt cex
+*)
 
     )
 
@@ -441,7 +452,7 @@ let pp_print_counterexample_pt level trans_sys prop_name ppf = function
 let pp_print_path_pt trans_sys init ppf path = 
 
   (* Distinguish between input formats *)
-  match TransSys.get_input trans_sys with
+  match TransSys.get_source trans_sys with
         
     (* Lustre input *)
     | TransSys.Lustre nodes ->
@@ -453,12 +464,17 @@ let pp_print_path_pt trans_sys init ppf path =
           
     (* Native input *)
     | TransSys.Native ->
+
+      (*
       
       (* Output path *)
       Format.fprintf ppf 
         "%a"
         NativeInput.pp_print_path_pt path
 
+      *)
+
+      assert false
 
 (* Output execution path as XML *)
 let execution_path_pt level trans_sys path = 
@@ -584,6 +600,7 @@ let xml_src_of_kind_module = function
   | `BMC -> "bmc"
   | `IND -> "indstep"
   | `INVGEN -> "invgen"
+  | `INVGENOS -> "invgenos"
   | `INVMAN -> "invman"
   | `Interpreter -> "interpreter"
   | `Parser -> "parser"
@@ -656,7 +673,7 @@ let pp_print_counterexample_xml trans_sys prop_name ppf = function
     (
 
       (* Distinguish between input formats *)
-      match TransSys.get_input trans_sys with
+      match TransSys.get_source trans_sys with
 
         (* Lustre input *)
         | TransSys.Lustre nodes ->
@@ -672,10 +689,14 @@ let pp_print_counterexample_xml trans_sys prop_name ppf = function
         (* Native input *)
         | TransSys.Native ->
 
+(*
           (* Output counterexample *)
           Format.fprintf ppf 
             "@[<hv 2><Counterexample>@,%a@;<0 -2></Counterexample>@]"
             NativeInput.pp_print_path_xml cex
+*)
+
+          assert false
 
     )
 
@@ -684,7 +705,7 @@ let pp_print_counterexample_xml trans_sys prop_name ppf = function
 let pp_print_path_xml trans_sys init ppf path = 
 
   (* Distinguish between input formats *)
-  match TransSys.get_input trans_sys with
+  match TransSys.get_source trans_sys with
         
     (* Lustre input *)
     | TransSys.Lustre nodes ->
@@ -697,11 +718,14 @@ let pp_print_path_xml trans_sys init ppf path =
     (* Native input *)
     | TransSys.Native ->
       
+(*
       (* Output path *)
       Format.fprintf ppf 
         "%a"
         NativeInput.pp_print_path_xml path
+*)
 
+      assert false
 
 (* Output execution path as XML *)
 let execution_path_xml level trans_sys path = 
@@ -940,6 +964,7 @@ let log_prop_status level prop_status =
 
 (* Output statistics of a section of a source *)
 let log_stat mdl level stats =
+
   match !log_format with 
     | F_pt -> stat_pt mdl level stats
     | F_xml -> stat_xml mdl level stats
@@ -1186,6 +1211,11 @@ let recv () =
   (* Don't fail if not initialized *) 
   with Messaging.NotInitialized -> []
 
+(* Terminates if a termination message was received. Does NOT modified
+   received messages. *)
+let check_termination () =
+  if EventMessaging.check_termination ()
+  then raise Terminate else ()
 
 
 (* Update transition system from event list *)
