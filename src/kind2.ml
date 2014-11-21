@@ -31,6 +31,7 @@ module BMC = Base
 module IND = Step
 module InvGen = InvGenGraph
 module InvGenOS = InvGenGraphOneState
+module InvGenBdd = InvGenBdd
 
 (* module PDR = Dummy *)
 
