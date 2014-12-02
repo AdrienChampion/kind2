@@ -14,13 +14,14 @@
    implied. See the License for the specific language governing
    permissions and limitations under the License. 
 
- *)
+*)
 
-(** Clean up before exit. *)
+(** Clean up before exit *)
 val on_exit: TransSys.t option -> unit
 
-(** Runs the base instance. *)
+(** Runs the step instance. *)
 val main: TransSys.t -> unit
+
 
 (* 
    Local Variables:

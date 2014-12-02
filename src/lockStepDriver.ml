@@ -90,10 +90,10 @@ let add_invariants ({ k ; solver ; invariants } as context)
           kp1 ;
      
      (* Updating context. *)
-     context.invariants <- List.rev_append invariants' invariants ;
+     context.invariants <- List.rev_append invariants' invariants
 
      (* Making sure everything makes sense. *)
-     check_consistency context
+     (* check_consistency context *)
 
 
 (* Unrolls [sys] at [k+1] if it is only unrolled up to [k]. *)
@@ -146,23 +146,24 @@ let increment ({ systems ; k ; solver ; invariants } as context) =
   |> List.iter
        (fun (sys, _) -> soft_increment context sys) ;
 
-  (* Asserting invariants at k+1. *)
+  (* Asserting invariants at k+2 (k+1+1, for step. Invariants are
+     already asserted at k+1.). *)
   ( match invariants with
     | [] -> ()
     | invariants ->
        Term.mk_and invariants
-       |> Term.bump_state Numeral.(succ k)
+       |> Term.bump_state Numeral.(succ (succ k))
        |> Solver.assert_term solver ) ;
 
   (* Incrementing the k. *)
-  context.k <- Numeral.succ context.k ;
+  context.k <- Numeral.succ context.k
 
   (* Making sure everything is legal. *)
-  check_consistency context
+  (* check_consistency context *)
 
   
 (* Creates a lsd instance. *)
-let create two_state sys =
+let create two_state top_only sys =
 
   (* Creating solver. *)
   let solver =
@@ -192,9 +193,18 @@ let create two_state sys =
            (* Term version. *)
            let actlit_term = Actlit.term_of_actlit actlit in
 
-           (* Building the numeral / actlit pair while recursing. *)
-           loop ((sys, (Numeral.zero, actlit_term)) :: all_sys)
-                (List.rev_append (TransSys.get_subsystems sys) tail)
+           let all_sys' =
+             (sys, (Numeral.zero, actlit_term)) :: all_sys
+           in
+
+           if top_only then
+             (* If top only then we do not recurse. *)
+             all_sys'
+           else
+             (* Otherwise recursing. *)
+             loop
+               all_sys'
+               (List.rev_append (TransSys.get_subsystems sys) tail)
 
       | [] -> all_sys
     in
@@ -209,21 +219,35 @@ let create two_state sys =
   TransSys.iter_uf_definitions sys (Solver.define_fun solver) ;
 
   (* For each system, declare things and assert the implication
-     between its init actlit and its init predicate. *)
-  systems
-  |> List.iter
-       ( fun (sys, (zero, actlit)) ->
+     between its init actlit and its init predicate. Also, declare
+     system invariants at 0 and extract them. *)
+  let invariants =
+    systems
+    |> List.fold_left
+        ( fun list (sys, (zero, actlit)) ->
 
-         (* Declaring things. *)
-         TransSys.iter_state_var_declarations
-           sys (fun sv ->
-                if sv != TransSys.init_flag_uf
-                then Solver.declare_fun solver sv) ;
+          (* Declaring things. *)
+          TransSys.iter_state_var_declarations
+            sys (fun sv ->
+              if sv != TransSys.init_flag_uf
+              then Solver.declare_fun solver sv) ;
          
-         (* Building the init implication. *)
-         Term.mk_implies
-           [ actlit ; TransSys.init_of_bound sys zero ]
-         |> Solver.assert_term solver ) ;
+          (* Building the init implication. *)
+          Term.mk_implies
+            [ actlit ; TransSys.init_of_bound sys zero ]
+            |> Solver.assert_term solver ;
+
+          (* Invariants if the system at 0. *)
+          let invariants =
+            TransSys.invars_of_bound sys Numeral.zero
+          in
+
+          (* Asserting trans sys invariants. *)
+          Solver.assert_term solver invariants ;
+          
+          invariants :: list )
+        []
+  in
 
 
   (* Constructing the lsd context. *)
@@ -232,14 +256,22 @@ let create two_state sys =
     solver ;
     two_state ;
     k = Numeral.zero ;
-    invariants = [] ;
+    invariants = invariants ;
   } in
 
   (* Making the lsd instance is consistent. *)
-  check_consistency lsd ;
+  (* check_consistency lsd ; *)
 
   (* Incrementing if we are in two state mode. *)
-  if two_state then increment lsd ;
+  if two_state then (
+    (* Asserting invariants at 1 if in two_state mode. *)
+    List.iter
+      (fun inv -> Term.bump_state Numeral.one inv
+                  |> Solver.assert_term solver)
+      invariants ;
+    
+    increment lsd
+  ) ;
 
   (* Returning the lsd instance. *)
   lsd
@@ -311,6 +343,9 @@ let query_base ({ systems ; solver ; two_state ; k } as context)
     (* Function to run if unsat. *)
     let if_unsat () = None in
 
+    (* Checking if we should terminate before doing anything. *)
+    Event.check_termination () ;
+
     (* Checksat-ing. *)
     let result =
       Solver.check_sat_assuming
@@ -336,6 +371,7 @@ let query_base ({ systems ; solver ; two_state ; k } as context)
 
 
 let rec split_closure solver two_state k falsifiable = function
+
   | [] -> (falsifiable, [])
 
   | terms_to_check ->
@@ -426,6 +462,9 @@ let rec split_closure solver two_state k falsifiable = function
        (* Returning result. *)
        falsifiable, terms_to_check
      in
+
+     (* Checking if we should terminate before doing anything. *)
+     Event.check_termination () ;
 
      (* Checksat-ing. *)
      Solver.check_sat_assuming

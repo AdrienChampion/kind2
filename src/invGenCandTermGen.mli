@@ -16,28 +16,20 @@
 
 *)
 
+(** Generates candidate terms for a transition system, and its
+    subsystems if the flags require it. The first parameter is a flag
+    for two state candidate terms generation. The result features the
+    number of candidate terms generated.
+    {b These sets do NOT contain [true] and [false].} *)
+val generate_candidate_terms :
+  bool -> TransSys.t -> (TransSys.t * Term.TermSet.t) list * int
 
-(** One state graph-based invariant generation module. *)
-module OneState : sig
-
-  (** Invariant generation entry point. *)
-  val main : TransSys.t -> unit
-
-  (** Destroys the underlying solver and cleans things up. *)
-  val on_exit : TransSys.t option -> unit
-
-end
-
-(** Two state graph-based invariant generation module. *)
-module TwoState : sig
-
-  (** Invariant generation entry point. *)
-  val main : TransSys.t -> unit
-
-  (** Destroys the underlying solver and cleans things up. *)
-  val on_exit : TransSys.t option -> unit
-
-end
+(** Generates implication graphs for a transition system, and its
+    subsystems if the flags require it. The first parameter is a flag
+    for two state candidate terms generation. The result features the
+    number of candidate terms generated. *)
+val generate_graphs :
+  bool -> TransSys.t -> (TransSys.t * ImplicationGraph.t) list * int
 
 (* 
    Local Variables:

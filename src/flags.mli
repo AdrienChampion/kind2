@@ -85,6 +85,10 @@ val bmc_max : unit -> bmc_max
 type check_version = bool
 val check_version : unit -> check_version
 
+(** Unroll the system backwards *)
+type ind_backward = bool
+val ind_backward : unit -> ind_backward
+
 (** Compresss inductive counterexample *)
 type ind_compress = bool
 val ind_compress : unit -> ind_compress
@@ -101,6 +105,10 @@ val ind_compress_same_succ : unit -> ind_compress_same_succ
 (** Compresss inductive counterexample when states have same predecessors *)
 type ind_compress_same_pred = bool
 val ind_compress_same_pred : unit -> ind_compress_same_pred
+
+(** Lazy assertion of invariants. *)
+type ind_lazy_invariants = bool
+val ind_lazy_invariants : unit -> ind_lazy_invariants
 
 (** Output inductive counterexample *)
 type ind_print_inductive_cex = bool
@@ -172,15 +180,19 @@ type cooper_general_lbound = bool
 val cooper_general_lbound : unit -> cooper_general_lbound
 
 (** InvGen will only look for top level invariants. **)
-type invgen_top_only = bool
-val invgen_top_only : unit -> invgen_top_only
+type invgengraph_top_only = bool
+val invgengraph_top_only : unit -> invgengraph_top_only
 (** InvGen will only consider atomic candidate terms. *)
-type invgen_atoms_only = bool
-val invgen_atoms_only : unit -> invgen_atoms_only
+type invgengraph_atoms_only = bool
+val invgengraph_atoms_only : unit -> invgengraph_atoms_only
 (** InvGen will look for candidate terms in the transition
     predicate. *)
-type invgen_scan_trans = bool
-val invgen_scan_trans : unit -> invgen_scan_trans
+type invgengraph_no_trans_subterms = bool
+val invgengraph_no_trans_subterms : unit -> invgengraph_no_trans_subterms
+
+(** Renice invariant generation process *)
+type invgengraph_renice = int
+val invgengraph_renice : unit -> invgengraph_renice
 
 (** Read input from file **)
 type interpreter_input_file = string
