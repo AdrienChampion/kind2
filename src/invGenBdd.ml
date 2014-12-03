@@ -595,7 +595,7 @@ open BddSolver
    states. *)
 let rec base_case iteration sys solver abstractor =
 
-  print_to abstractor (Format.sprintf "dot/bdd-base-%03i.dot" iteration) ;
+  (* print_to abstractor (Format.sprintf "dot/bdd-base-%03i.dot" iteration) ; *)
 
   let _ = debug invGenBdd "Checking base case." in () in
   
@@ -630,9 +630,9 @@ let rec base_case iteration sys solver abstractor =
 
 let rec step_case iteration sys solver abstractor =
 
-  let _ = 
-    print_to abstractor (Format.sprintf "dot/bdd-step-%03i-000.dot" iteration)
-  in
+  (* let _ =  *)
+  (*   print_to abstractor (Format.sprintf "dot/bdd-step-%03i-000.dot" iteration) *)
+  (* in *)
 
   debug invGenBdd "Step case is at %i." iteration in
 
@@ -656,10 +656,10 @@ let rec step_case iteration sys solver abstractor =
 
 and loop iteration inner_iteration sys solver abstractor model =
 
-    let _ = 
-      print_to abstractor
-        (Format.sprintf "dot/bdd-step-%03i-%03i.dot" iteration inner_iteration)
-    in
+    (* let _ =  *)
+    (*   print_to abstractor *)
+    (*     (Format.sprintf "dot/bdd-step-%03i-%03i.dot" iteration inner_iteration) *)
+    (* in *)
 
     debug invGenBdd
       "Starting loop %i:%i."
@@ -721,10 +721,25 @@ let main trans =
     InvGenCandTermGen.generate_candidate_terms false trans
     |> fst |> get_last
     |> Term.TermSet.filter (fun t -> not ( t == Term.t_true || t == Term.t_false))
+    |> (fun cand ->
+      Term.TermSet.fold
+        ( fun term set ->
+          let term =
+            if Term.is_negated term
+            then Term.negate_simplify term else term
+          in
+          if Term.TermSet.mem (Term.negate_simplify term) set
+          then set
+          else Term.TermSet.add term set )
+        cand
+        Term.TermSet.empty)
   in
+
+  debug invGenBdd "%i candidate terms." (Term.TermSet.cardinal candidate_terms) in
 
   (* Launching base case. *)
   base_case 1 trans solver (mk_abstractor candidate_terms)
+  (* Moving on to step case. *)
   |> step_case 1 trans solver
 
 (* Cleans up things on exit. *)
