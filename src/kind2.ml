@@ -28,7 +28,7 @@ end
 *)
 
 module BMC = Base
-module InvGenTS = InvGenGraph.TwoState
+module InvGenTS = Hulls
 module InvGenOS = InvGenGraph.OneState
 
 (* module PDR = Dummy *)
