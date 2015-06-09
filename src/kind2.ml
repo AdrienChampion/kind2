@@ -31,6 +31,8 @@ module BMC = Base
 module InvGenTS = InvGenGraph.TwoState
 module InvGenOS = InvGenGraph.OneState
 
+module PreImage = Preimage
+
 (* module IC3 = Dummy *)
 
 let children_pgid = ref 0
@@ -928,6 +930,11 @@ let main () =
           
           (* Horn.of_file (Flags.input_file ()) *)
           assert false);
+
+    ( match !trans_sys with
+      | None -> assert false
+      | Some sys -> PreImage.test sys ) ;
+    exit 0 ;
 
     (* Output the transition system *)
     (debug parse
