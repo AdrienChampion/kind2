@@ -29,21 +29,9 @@
       this iteration_, at [1].
 
     Function [inc] increments the context so that [get_disjunct] computes the
-    preimage of the one it was computing before the call to [inc]. In practice,
-    [inc] updates the actlits:
-
-    * [src_actlit] becomes [nxt_actlit].
-    * [blk_actlit] is replaced by a fresh actlit.
-    * [nxt_actlit] becomes fresh too.
-
-    Behavior is different if optional argument [blocking] was set to true in
-    [mk_context].
-
-    * [src_actlit] becomes [next_actlit].
-    * [blk_actlit] is the same: disjuncts from previous preimages are still
-      blocked.
-    * [nxt_actlit] is replaced by a fresh actlit.
-*)
+    preimage of the one it was computing before the call to [inc]. The optional
+    argument [blocking] to [mk_context] will force preimage computation to look
+    for models outside of the previously computed preimages. *)
 
 (** Stores info needed to compute preimages. *)
 type context
