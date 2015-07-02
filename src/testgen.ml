@@ -339,14 +339,15 @@ let oracle_of_nodes out_dir nodes =
       |> List.fold_left
         ( fun l (m: N.contract) -> (
             m,
-            mk_out_ident_req m.N.name,
-            mk_and m.N.reqs
-          ) :: (
-            m,
             mk_out_ident m.N.name,
             mk_impl (mk_and m.N.reqs) (mk_and m.N.enss)
+          ) :: (
+            m,
+            mk_out_ident_req m.N.name,
+            mk_and m.N.reqs
           ) :: l )
         []
+      |> List.rev
       |> (fun l -> match globl with
         | None -> l
         | Some c ->

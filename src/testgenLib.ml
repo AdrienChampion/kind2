@@ -581,7 +581,7 @@ let testcase_gen strat_out_dir dir pp_testcase context get_model =
   in
 
   Format.fprintf gv_fmt
-    "digraph mode_graph {@.  \
+    "strict digraph mode_graph {@.  \
      @[<v>" ;
 
   let names_of = List.fold_left
