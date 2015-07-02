@@ -804,11 +804,10 @@ let main () =
         TransSys.pp_print_trans_sys trans_sys
       end ) ;
 
-    (* Set module to supervisor. *)
-    Event.set_module `Supervisor ;
-
     (* Running test generation if asked. *)
     if Flags.testgen_active () then (
+      (* Set module to test gen. *)
+      Event.set_module `TESTGEN ;
       (* Building abstraction. *)
       Refiner.set_first_abstraction trans_sys ;
       Format.printf
@@ -820,9 +819,12 @@ let main () =
         (TransSys.get_abstraction trans_sys) ;
       (* Launching test generation. *)
       Testgen.main trans_sys
-    ) else
+    ) else (
+      (* Set module to supervisor. *)
+      Event.set_module `Supervisor ;
       (* Analyzing system. *)
       setup_and_run trans_sys
+    )
 
   with
 

@@ -342,6 +342,7 @@ module MdlMap =
         | `PDR -> 3
         | `INVGEN -> 4
         | `INVGENOS -> 5
+        | `TESTGEN -> 6
           
       let compare m1 m2 = 
         compare (int_of_kind_module m1) (int_of_kind_module m2)
@@ -387,6 +388,7 @@ let pt_string_of_kind_module = function
   | `IND -> "inductive step"
   | `INVGEN -> "two state invariant generator"
   | `INVGENOS -> "one state invariant generator"
+  | `TESTGEN -> "test generation"
   | `Supervisor -> "supervisor"
   | `Interpreter -> "interpreter"
   | `Parser -> "parser"
@@ -728,6 +730,7 @@ let xml_src_of_kind_module = function
   | `IND -> "indstep"
   | `INVGEN -> "invgen"
   | `INVGENOS -> "invgenos"
+  | `TESTGEN -> "testgen"
   | `Supervisor -> "supervisor"
   | `Interpreter -> "interpreter"
   | `Parser -> "parser"

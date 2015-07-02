@@ -288,6 +288,7 @@ type kind_module =
   | `IND
   | `INVGEN
   | `INVGENOS
+  | `TESTGEN
   | `Interpreter
   | `Supervisor
   | `Parser ]

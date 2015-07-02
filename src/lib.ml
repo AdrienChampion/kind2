@@ -941,6 +941,7 @@ type kind_module =
   | `IND
   | `INVGEN
   | `INVGENOS
+  | `TESTGEN
   | `Interpreter
   | `Supervisor
   | `Parser ]
@@ -953,6 +954,7 @@ let pp_print_kind_module ppf = function
   | `IND -> Format.fprintf ppf "inductive step"
   | `INVGEN -> Format.fprintf ppf "two state invariant generator"
   | `INVGENOS -> Format.fprintf ppf "one state invariant generator"
+  | `TESTGEN -> Format.fprintf ppf "test generation"
   | `Interpreter -> Format.fprintf ppf "interpreter"
   | `Supervisor -> Format.fprintf ppf "supervisor"
   | `Parser -> Format.fprintf ppf "parser"
@@ -969,6 +971,7 @@ let suffix_of_kind_module = function
  | `IND -> "ind"
  | `INVGEN -> "invgents"
  | `INVGENOS -> "invgenos"
+ | `TESTGEN -> "testgen"
  | `Interpreter -> "interp"
  | `Supervisor -> "supervisor"
  | `Parser -> "parse"
@@ -981,6 +984,7 @@ let kind_module_of_string = function
   | "IND" -> `IND
   | "INVGEN" -> `INVGEN
   | "INVGENOS" -> `INVGENOS
+  | "TESTGEN" -> `TESTGEN
   | _ -> raise (Invalid_argument "kind_module_of_string")
 
 
