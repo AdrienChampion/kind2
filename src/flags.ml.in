@@ -1256,7 +1256,8 @@ let testgen_lustrec_spec =
    Arg.String testgen_lustrec_action,
    Format.sprintf
      "@[<v 7>@,(default: %s)@ \
-      Activates test generation.@]"
+      Sets the command for the lustreC compiler and activates@ \
+      oracle compilation.@]"
      (match testgen_lustrec_default with | Some def -> def | _ -> "inactive"))
   
 (* ********** *) 

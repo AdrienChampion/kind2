@@ -234,8 +234,7 @@ let run_strategy out_dir sys strategy =
         k k ;
 
       (* Unroll at k. *)
-      TransSys.trans_of_bound sys k
-      |> SMTSolver.assert_term solver ;
+      TransSys.trans_of_bound sys k |> SMTSolver.assert_term solver ;
 
       loop_strategy k
     )
@@ -406,11 +405,11 @@ let oracle_of_nodes out_dir nodes =
 
   let filtered_top_eqs =
     top.N.equations
-    |> List.filter
-      (fun (sv,_) ->
-        oracle_inputs
-        |> List.exists (fun (sv',_) -> sv == sv')
-        |> not)
+    |> List.filter (fun (sv,_) ->
+      oracle_inputs
+      |> List.exists (fun (sv',_) -> StateVar.equal_state_vars sv sv')
+      |> not
+    )
   in
 
   (* Format.printf
@@ -460,16 +459,14 @@ let oracle_of_nodes out_dir nodes =
             Format.printf "  %a" (LustreIdent.pp_print_ident false) n.N.name)
     | _ -> assert false ) ; *)
 
-  let out_file =
-    Format.asprintf
-      "%s/%a.lus" out_dir (LustreIdent.pp_print_ident false) oracle_ident
+  let out_file = Format.asprintf
+    "%s/%a.lus" out_dir (LustreIdent.pp_print_ident false) oracle_ident
   in
 
   Format.printf "Writing oracle to %s@." out_file ;
 
-  let file =
-    Unix.openfile
-      out_file [ Unix.O_TRUNC ; Unix.O_WRONLY ; Unix.O_CREAT ] 0o640
+  let file = Unix.openfile
+    out_file [ Unix.O_TRUNC ; Unix.O_WRONLY ; Unix.O_CREAT ] 0o640
   in
 
   let out_fmt =
@@ -572,13 +569,11 @@ let main sys =
   let strategies = [ Strats.unit_mode_switch ] in
 
   (* Running the strategies, retrieving the name of the xml files. *)
-  let subfiles =
-    ( try
-        strategies
-        |> List.map (run_strategy out_dir sys)
-      with e ->
-        delete_solver () ;
-        raise e )
+  let subfiles = try
+    strategies |> List.map (run_strategy out_dir sys)
+  with e ->
+    delete_solver () ;
+    raise e
   in
 
   Format.printf "@." ;

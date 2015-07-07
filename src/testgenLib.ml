@@ -513,7 +513,7 @@ let extend_contract_testcases ( {sys ; data} as context ) k =
       [ actlit, k, (k, contracts') :: path ]
 
     (* More than one branch. *)
-    | path, _ ->
+    | path, _ :: _ ->
       (* Need to create one new actlit per branch, activating the same path
          than [actlit] and its own branch. *)
       branches |> List.map (fun contracts ->
@@ -540,6 +540,12 @@ let extend_contract_testcases ( {sys ; data} as context ) k =
           (* We are activating a new contract. *)
           actlit', k, (k, contracts) :: path
       )
+    (* Cannot activate any mode from this path. *)
+    | path, [] ->
+      Format.asprintf
+        "the following path cannot take any more transitions:@,@[<hv>%a@]@,"
+        (pp_print_contract_testcase_named sys) path
+      |> failwith
   in
 
   data |> List.fold_left
