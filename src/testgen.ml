@@ -22,6 +22,8 @@ module S = SMTSolver
 module Strats = TestgenStrategies
 module N = LustreNode
 
+module Unused_for_now = TestgenSolver
+
 (* Reference to the solver instance. *)
 let solver_ref = ref None
 
