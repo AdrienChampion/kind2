@@ -23,7 +23,7 @@ module Strats = TestgenStrategies
 module N = LustreNode
 
 module Unused_for_now = TestgenSolver
-module Unused_for_now_too = TestgenAbstract
+module Unused_for_now_too = TestgenTree
 
 (* Reference to the solver instance. *)
 let solver_ref = ref None
