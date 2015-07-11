@@ -53,8 +53,11 @@ type t = {
   mutable actlits: actlit list ;
 }
 
+let println = Format.printf "| %s@."
+
 (* Creates a new solver wrapper. The first actlit activates init@0. *)
 let mk sys =
+  println "creating solver" ;
   (* Creating solver. *)
   let solver =
     S.create_instance
@@ -64,17 +67,27 @@ let mk sys =
       (Sys.get_abstraction sys)
       (Flags.smtsolver ())
   in
+  println "declaring vars@0" ;
   (* Declaring variables at 0. *)
-  Sys.vars_of_bounds sys zero zero |> Var.declare_vars (S.declare_fun solver) ;
+  TransSys.init_solver
+    sys
+    (S.trace_comment solver)
+    (S.define_fun solver)
+    (S.declare_fun solver)
+    (S.assert_term solver)
+    zero zero ;
   (* Getting fresh actlit. *)
   let actlit =
     let fresh = fresh_actlit () in
     S.declare_fun solver fresh ;
     term_of_actlit fresh
   in
+  println "conditional init" ;
   (* Asserting init conditionally. *)
   Term.mk_implies [ actlit ; Sys.init_of_bound sys zero ]
   |> S.assert_term solver ;
+
+  println "done" ;
 
   { sys ; solver ; actlits = [ actlit ] }
 
@@ -127,9 +140,12 @@ let nth_actlit_of ({ sys ; solver ; actlits } as t) n =
    created for [term], and a check-sat with assumptions [term :: actlits] will
    be performed. The fresh actlit is deactivated at the end of the check.
 
-   If sat, returns some of an association list yielding the values of [terms].
-   Returns none otherwise.  *)
-let checksat ({ solver } as t) n term actlits terms =
+   [terms] is an association map, the values of which are terms. If sat,
+   returns some of a map mapping the keys of [terms] to the value of the
+   corresponding term in the model, along with whatever the [f] returns when
+   ran on the solver.
+   Returns none otherwise. *)
+let checksat ({ solver } as t) n term actlits terms f =
   (* Getting fresh actlit, declaring it at the same time. *)
   let actlit =
     let fresh = fresh_actlit () in
@@ -146,10 +162,19 @@ let checksat ({ solver } as t) n term actlits terms =
     (* If sat. *)
     ( fun () ->
         (* Retrieving values. *)
-        let values = S.get_term_values solver terms in
+        let values =
+          terms |> List.map snd |> S.get_term_values solver
+        in
+        (* Running f. *)
+        let whatever = f solver in
         (* Deactivating actlit. *)
         Term.mk_not actlit |> S.assert_term solver ;
-        Some values )
+        Some (
+          terms |> List.map (fun (key,term) ->
+            key, List.assq term values
+          ),
+          whatever
+        ) )
     (* If unsat. *)
     ( fun () ->
         (* Deactivating actlit. *)

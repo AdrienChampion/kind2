@@ -68,7 +68,7 @@ type rev_tree_adt =
 *)
 | Top
 (*
-  A node is its depth,  the node it comes from, the mode it corresponds to, and
+  A node is its depth, the node it comes from, the mode it corresponds to, and
   the mode conjunctions already explored from this node.
 *)
 | Node of depth * rev_tree_adt * mode_conj * (mode_conj list)
@@ -96,13 +96,8 @@ exception TopReached of witness list
   Originally there are no witnesses, some initial state mode, and no modes
   explored.
 *)
-let mk_reved_tree mode_to_term mode_conj =
+let mk mode_to_term mode_conj =
   { mode_to_term ; ws = [] ; tree = Node (Num.zero, Top, mode_conj, []) }
-
-(*
-  The tree stored in a [reved_tree].
-*)
-let rev_tree_of { tree } = tree
 
 (*
   Returns the list of term the conjunction of which encodes the path of modes
@@ -125,14 +120,19 @@ let term_of_path mode_to_term tree =
   loop tree
 
 (*
-  Returns the list of mode conjunctions corresponding to a partial tree.
+  Returns the list of mode conjunctions corresponding to a partial tree adt.
 *)
-let mode_path_of tree =
+let mode_path_of_adt tree =
   let rec loop tree prefix = match tree with
     | Node (_, kid, mode_conj, _) -> mode_conj :: prefix |> loop kid
     | Top -> List.rev prefix
   in
   loop tree []
+
+(*
+  Returns the list of mode conjunctions corresponding to a partial tree.
+*)
+let mode_path_of { tree } = mode_path_of_adt tree
 
 (*
   Returns the term encoding the path of modes represented by a tree.
@@ -186,12 +186,30 @@ let pop ({ ws ; tree } as t) = match tree with
 | Top -> TopReached ws |> raise
 
 (*
+  Updates the current mode.
+*)
+let update ({ ws ; tree } as t) mode_conj = match tree with
+| Node (k, kid, mode_conj', explored) ->
+  t.tree <- Node (k, kid, mode_conj, mode_conj' :: explored)
+| Top  -> TopReached ws |> raise
+
+(*
   Adds a witness for the current node.
 
   Used when at maximal depth to store a witness.
 *)
 let add_witness ({ ws ; tree } as t) model =
-  t.ws <- ( model, (mode_path_of tree) ) :: ws
+  t.ws <- ( model, (mode_path_of_adt tree) ) :: ws
+
+
+
+
+(* |===| Pretty printers. *)
+let pp_print_tree fmt ({ ws ; tree } as t) =
+  Format.fprintf fmt "@[<v>at %a, %d witnesses@]"
+    Num.pp_print_numeral (match tree with
+      | Top -> Num.zero | Node (k,_,_,_) -> k
+    ) (List.length ws)
 
 
 (* 

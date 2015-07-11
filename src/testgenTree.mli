@@ -63,7 +63,12 @@ exception TopReached of witness list
   Originally there are no witnesses, some initial state mode, and no modes
   explored.
 *)
-val mk_reved_tree: (string -> term) -> string list -> t
+val mk: (string -> term) -> string list -> t
+
+(**
+  Returns the list of mode conjunctions corresponding to a partial tree.
+*)
+val mode_path_of: t -> string list list
 
 (**
   Returns the term encoding the path of modes represented by a tree.
@@ -98,11 +103,21 @@ val push: t -> string list -> unit
 val pop: t -> unit
 
 (**
+  Updates the current mode.
+*)
+val update: t -> string list -> unit
+
+(**
   Adds a witness for the current node.
 
   Used when at maximal depth to store a witness.
 *)
 val add_witness: t -> model -> unit
+
+(**
+  Quiet tree pretty printer.
+*)
+val pp_print_tree: Format.formatter -> t -> unit
 
 
 (* 

@@ -24,6 +24,7 @@ module N = LustreNode
 
 module Unused_for_now = TestgenSolver
 module Unused_for_now_too = TestgenTree
+module Unused_for_now_either = TestgenDF
 
 (* Reference to the solver instance. *)
 let solver_ref = ref None

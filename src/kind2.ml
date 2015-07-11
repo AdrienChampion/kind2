@@ -26,7 +26,7 @@ module IND = Step
 module PDR = PDR
 module InvGenTS = InvGenGraph.TwoState
 module InvGenOS = InvGenGraph.OneState
-module TestGen = Testgen
+module TestGen = TestgenDF
 
 let dbl_sep_line_warn () =
   Event.log
@@ -818,7 +818,9 @@ let main () =
           ", ")
         (TransSys.get_abstraction trans_sys) ;
       (* Launching test generation. *)
-      Testgen.main trans_sys
+      TestGen.main trans_sys ;
+      (* Done. *)
+      TestGen.on_exit None
     ) else (
       (* Set module to supervisor. *)
       Event.set_module `Supervisor ;

@@ -56,8 +56,9 @@ val rm: t -> unit
     If sat, returns some of an association list yielding the values of [terms].
     Returns none otherwise.  *)
 val checksat:
-  t -> Numeral.t -> Term.t -> Term.t list -> Term.t list
-  -> (Term.t * Term.t) list option
+  t -> Numeral.t -> Term.t -> Term.t list -> ('a * Term.t) list
+  -> (SMTSolver.t -> 'b)
+  -> (('a * Term.t) list * 'b) option
 
 (* 
    Local Variables:
