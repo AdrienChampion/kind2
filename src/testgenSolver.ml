@@ -94,6 +94,9 @@ let mk sys =
 (* Destroys the underlying solver. *)
 let rm { solver } = S.delete_instance solver
 
+(* Comment trace for the underlying solver. *)
+let comment { solver } = S.trace_comment solver
+
 (* Returns the actlit activating the [n]th first transition relations. Creates
    fresh actlits and unrolls if necessary. *)
 let nth_actlit_of ({ sys ; solver ; actlits } as t) n =

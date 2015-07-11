@@ -46,6 +46,9 @@ val mk: TransSys.t -> t
 (** Destroys the underlying solver. *)
 val rm: t -> unit
 
+(** Comment trace for the underlying solver. *)
+val comment: t -> string -> unit
+
 
 (** [checksat t n term actlits terms]
     Checks the satisfiability of term [term] in conjunction with activation

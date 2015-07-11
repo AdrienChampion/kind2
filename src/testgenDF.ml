@@ -24,6 +24,14 @@ module Sys = TransSys
 module Num = Numeral
 
 
+
+(*
+  TODO:
+  Restart solver when too many actlits are created.
+  Log testcases for "online" behavior.
+*)
+
+
 (* Reference to the solver for clean exit. *)
 let solver_ref = ref None
 
@@ -46,34 +54,104 @@ let active_modes_of_map map =
       (pp_print_list Format.pp_print_string "@,") active ;
     active
 
-let forward solver tree modes contract_term =
+let rec enumerate solver tree modes contract_term =
+  Format.printf "@.enumerate@." ;
+  Solver.comment solver "enumerate" ;
   let rec loop () =
-    Format.printf "Tree: %a@." Tree.pp_print_tree tree ;
-    let k = Tree.depth_of tree |> Num.succ in
-    Format.printf "at %a@." Num.pp_print_numeral k ;
+    Format.printf "  tree: %a@." Tree.pp_print_tree tree ;
+    let k = Tree.depth_of tree in
     let modes = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
     let contract_term = Term.bump_state k contract_term in
-    let mode_path = Term.mk_and [ Tree.path_of tree ; contract_term ] in
+    let mode_path =
+      Term.mk_and [ Tree.blocking_path_of tree ; contract_term ]
+    in
 
-    if Flags.testgen_len () = Num.to_int k then
-      (* We need the model. *)
-      ( match Solver.checksat solver k mode_path [] modes get_model with
-        | Some (map,model) ->
-          (* Extracting modes activated @k by the model. *)
-          active_modes_of_map map |> Tree.push tree ;
-          Tree.add_witness tree model
-        | None -> () )
-    else
-      (* Model is not needed. *)
-      ( match Solver.checksat solver k mode_path [] modes unit_of with
-        | Some (map,()) ->
-          (* Extracting modes activated @k by the model. *)
-          active_modes_of_map map |> Tree.push tree ;
-          loop ()
-        | None -> () )
+    match Solver.checksat solver k mode_path [] modes get_model with
+    | Some (map, model) ->
+      (* Extracting modes activated @k by the model. *)
+      active_modes_of_map map |> Tree.update tree ;
+      Tree.add_witness tree model ;
+      loop ()
+    | None -> ()
   in
-  loop ()
 
+  (* Let's find the first mode we can activate @k+1. *)
+
+  Format.printf "  tree: %a@." Tree.pp_print_tree tree ;
+  let k = Tree.depth_of tree |> Num.succ in
+  Format.printf "  at %a@." Num.pp_print_numeral k ;
+  let modes' = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
+  let contract_term' = Term.bump_state k contract_term in
+  let mode_path = Term.mk_and [ Tree.path_of tree ; contract_term' ] in
+
+  match Solver.checksat solver k mode_path [] modes' get_model with
+  | Some (map, model) ->
+    (* Extracting modes activated @k by the model. *)
+    active_modes_of_map map |> Tree.push tree ;
+    Tree.add_witness tree model ;
+    (* Enumerating the other mode conjunctions from the path. *)
+    loop () ;
+    (* Let's go backward now. *)
+    backward solver tree modes contract_term
+  | None ->
+    (* If we get unsat right away then something's wrong. *)
+    failwith "unsat"
+
+
+
+and forward solver tree modes contract_term =
+  Format.printf "@.forward@." ;
+  Solver.comment solver "forward" ;
+  let rec loop () =
+    Format.printf "  tree: %a@." Tree.pp_print_tree tree ;
+    let k = Tree.depth_of tree |> Num.succ in
+
+    if Flags.testgen_len () > Num.to_int k then (
+      (* We haven't reached the max depth yet, keep going forward. *)
+      Format.printf "  at %a@." Num.pp_print_numeral k ;
+      let modes = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
+      let contract_term = Term.bump_state k contract_term in
+      let mode_path = Term.mk_and [ Tree.path_of tree ; contract_term ] in
+
+      match Solver.checksat solver k mode_path [] modes unit_of with
+      | Some (map,()) ->
+        (* Extracting modes activated @k by the model. *)
+        active_modes_of_map map |> Tree.push tree ;
+        loop ()
+      | None -> failwith "unsat"
+    )
+  in
+  (* Going forward. *)
+  loop () ;
+  (* Max depth reached, enumerate reachable modes. *)
+  enumerate solver tree modes contract_term
+
+and backward solver tree modes contract_term =
+  Format.printf "@.backward@." ;
+  Solver.comment solver "backward" ;
+  Format.printf "  tree: %a@." Tree.pp_print_tree tree ;
+  let rec loop () =
+    Tree.pop tree ;
+    Format.printf "  popped tree: %a@." Tree.pp_print_tree tree ;
+    let k = Tree.depth_of tree in
+    let modes = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
+    let contract_term = Term.bump_state k contract_term in
+    let mode_path =
+      Term.mk_and [ Tree.blocking_path_of tree ; contract_term ]
+    in
+
+    match Solver.checksat solver k mode_path [] modes unit_of with
+    | Some (map,()) ->
+      (* Extracting modes activated @k by the model. *)
+      active_modes_of_map map |> Tree.update tree
+    | None ->
+      (* Cannot activate any other mode conjunction, going backward. *)
+      loop ()
+  in
+  (* Going backwards. *)
+  loop () ;
+  (* Found a different path, going forward now. *)
+  forward solver tree modes contract_term
 
 
 (* Entry point. *)
@@ -133,7 +211,8 @@ let main sys =
 
   Format.printf "depth is %a@." Num.pp_print_numeral (Tree.depth_of tree) ;
 
-  forward solver tree modes mode_term ;
+  ( try forward solver tree modes mode_term with
+    | TestgenTree.TopReached ws -> Format.printf "done@." ) ;
 
   Format.printf "Tree: %a@." Tree.pp_print_tree tree ;
 
