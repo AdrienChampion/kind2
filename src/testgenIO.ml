@@ -18,6 +18,8 @@
 
 open Lib
 
+module N = LustreNode
+
 type sys = TransSys.t
 type svar = StateVar.t
 type actlit = UfSymbol.t
@@ -47,6 +49,9 @@ let openfile path = Unix.openfile path [
   Unix.O_TRUNC ; Unix.O_WRONLY ; Unix.O_CREAT
 ] 0o640
 
+let mk_dir dir =
+  try Unix.mkdir dir 0o740 with Unix.Unix_error(Unix.EEXIST, _, _) -> ()
+
 let fmt_of_file file =
   Unix.out_channel_of_descr file |> Format.formatter_of_out_channel
 
@@ -54,10 +59,7 @@ let fmt_of_file file =
 let mk sys root name title =
   (* |===| Testcases directory. *)
   let dir = Format.sprintf "%s/%s" root name in
-  ( try if Sys.is_directory dir |> not
-      then assert false else ()
-    with e ->
-      Unix.mkdir dir 0o740 ) ;
+  mk_dir dir ;
 
   (* |===| XML class file. *)
   let class_file =
@@ -168,13 +170,117 @@ let testcase_to_xml t modes model k =
   let graph_fmt = fmt_of_file t.graph_file in
   pp_print_model_path graph_fmt modes ;
 
-  (* let class_fmt = fmt_of_file t.class_file in
-  let graph_fmt = fmt_of_file t.graph_file in *)
-
   ()
 
 
+(* |===| Oracle generation. *)
 
+(* Generates an oracle for the top system of [sys]. The inputs will be the
+   inputs and outputs of [sys]. [terms] is a list of
+   [LustreIdent.t * LustreExpr.t], used as outputs for the oracle. The
+   [LustreIdent.t] is the name of the output and will be defined to be equal to
+   its corresponding expression.
+   The oracle will be created in a folder in [root].
+
+   Returns the path to the oracle. *)
+let generate_oracles sys root terms =
+  let oracle_dir = Format.sprintf "%s/oracle" root in
+  mk_dir oracle_dir ;
+  let oracle_name sys = Format.asprintf
+    "%a_oracle" (LustreIdent.pp_print_ident false) sys.N.name
+  in
+  (* Extracting lustre nodes. *)
+  let nodes = match TransSys.get_source sys with
+    | TransSys.Lustre nodes -> nodes
+    | TransSys.Native -> assert false
+  in
+  let oracle_path =
+    List.rev nodes |> List.hd |> oracle_name
+    |> Format.sprintf "%s/%s.lus" oracle_dir
+  in
+
+  let (top, subs) =
+    let rec last_rev_tail acc = function
+      | [ h ] -> (h, acc)
+      | h :: t -> last_rev_tail (h :: acc) t
+      | [] -> assert false
+    in
+    last_rev_tail [] nodes
+  in
+
+  let oracle_ident =
+    oracle_name top |> LustreIdent.mk_string_ident
+  in
+
+  let oracle_inputs = top.N.inputs @ top.N.outputs in
+
+  let oracle_outputs, oracle_out_equations =
+    terms
+    |> List.fold_left
+        ( fun (out,eqs) (id,expr) ->
+            let sv =
+              LustreExpr.mk_state_var_of_ident
+                (LustreIdent.index_of_ident id)
+                id
+                (Type.mk_type Type.Bool)
+            in
+            (sv, LustreIdent.index_of_ident id) :: out,
+            (sv, expr) :: eqs )
+        ([],[])
+    |> fun (out,eqs) -> List.rev out, List.rev eqs
+  in
+
+  let oracle_out_svs = List.map (fun (sv,_) -> sv) oracle_outputs in
+
+  let filtered_top_eqs =
+    top.N.equations
+    |> List.filter (fun (sv,_) ->
+      oracle_inputs
+      |> List.exists (fun (sv',_) -> StateVar.equal_state_vars sv sv')
+      |> not
+    )
+  in
+
+  let oracle: N.t = {
+    N.name = oracle_ident ;
+    N.inputs = oracle_inputs ;
+    N.oracles = top.N.oracles ;
+    N.outputs = oracle_outputs ;
+    N.observers = [] ; (*top.N.observers ;*)
+    N.locals = top.N.locals ;
+    N.equations = oracle_out_equations @ filtered_top_eqs ;
+    N.calls = top.N.calls ;
+    N.asserts = [] ;
+    N.props = [] ;
+    N.contract_spec = None ;
+    N.is_main = true ;
+    N.output_input_dep = [] ;
+    N.fresh_state_var_index = top.N.fresh_state_var_index ;
+    N.fresh_oracle_index = top.N.fresh_oracle_index ;
+    N.state_var_oracle_map = top.N.state_var_oracle_map ;
+    N.expr_state_var_map = top.N.expr_state_var_map ;
+  } in
+
+  let sliced =
+    N.reduce_to_coi (oracle :: subs) oracle_ident oracle_out_svs
+  in
+
+  Format.printf "Writing oracle to %s@." oracle_path ;
+
+  let file = openfile oracle_path in
+
+  let out_fmt = fmt_of_file file in
+
+  Format.fprintf
+    out_fmt "%a@?"
+    (pp_print_list
+      (N.pp_print_node ~no_subrange:true true)
+      "@.@.")
+    sliced ;
+
+  Unix.close file ;
+
+  oracle_path
 
 
 (* 

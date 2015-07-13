@@ -22,6 +22,7 @@ module Solver = TestgenSolver
 module Tree = TestgenTree
 module TSys = TransSys
 module Num = Numeral
+module N = LustreNode
 
 module IO = TestgenIO
 
@@ -183,8 +184,67 @@ let main sys =
     Format.sprintf "%s/%s"
       (Flags.testgen_out_dir ()) (TSys.get_scope sys |> String.concat ".")
   in
-  ( try if Sys.is_directory root |> not then assert false else ()
-    with e -> Unix.mkdir root 0o740 ) ;
+  IO.mk_dir root ;
+
+  Format.printf "generating oracle@." ;
+  let nodes = match TransSys.get_source sys with
+    | TransSys.Lustre nodes -> nodes
+    | TransSys.Native -> assert false
+  in
+  let (top, subs) =
+    let rec last_rev_tail acc = function
+      | [ h ] -> (h, acc)
+      | h :: t -> last_rev_tail (h :: acc) t
+      | [] -> assert false
+    in
+    last_rev_tail [] nodes
+  in
+  let mk_and = function
+    | [] -> LustreExpr.t_true
+    | [ e ] -> e
+    | e :: tail ->
+      let rec loop e = function
+        | e' :: tail -> loop (LustreExpr.mk_and e e') tail
+        | [] -> e
+      in
+      loop e tail
+  in
+  let mk_impl = LustreExpr.mk_impl in
+  let mk_out_ident id =
+    LustreIdent.mk_string_ident
+      ("output_" ^ ( (LustreIdent.string_of_ident false) id ))
+  in
+  let mk_out_ident_req id =
+    LustreIdent.mk_string_ident
+      ("output_" ^ ( (LustreIdent.string_of_ident false) id ) ^ "_req")
+  in
+  let contracts = match top.N.contract_spec with
+    | None ->
+      assert false
+    | Some (_, _, globl, modes, _) ->
+      modes
+      |> List.fold_left
+        ( fun l (m: N.contract) -> (
+            m,
+            mk_out_ident m.N.name,
+            mk_impl (mk_and m.N.reqs) (mk_and m.N.enss)
+          ) :: (
+            m,
+            mk_out_ident_req m.N.name,
+            mk_and m.N.reqs
+          ) :: l )
+        []
+      |> List.rev
+      |> (fun l -> match globl with
+        | None -> l
+        | Some c ->
+          (c, mk_out_ident_req c.N.name, mk_and c.N.reqs) ::
+          (c, mk_out_ident c.N.name, mk_and c.N.enss) :: l
+      )
+  in
+  let oracle_path =
+    List.map (fun (_,s,t) -> s, t) contracts |> IO.generate_oracles sys root
+  in
 
   (* Creating io context. *)
   let io = IO.mk sys root "unit" "unit tests" in
