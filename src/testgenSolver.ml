@@ -94,6 +94,9 @@ let mk sys =
 (* Destroys the underlying solver. *)
 let rm { solver } = S.delete_instance solver
 
+(* Destroys the underlying solver and creates a new one. *)
+let restart t = rm t ; mk t.sys
+
 (* Comment trace for the underlying solver. *)
 let comment { solver } = S.trace_comment solver
 

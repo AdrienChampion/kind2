@@ -37,6 +37,13 @@ val fresh_actlit: unit -> UfSymbol.t
 (** Returns the term corresponding to the input actlit. *)
 val term_of_actlit: UfSymbol.t -> Term.t
 
+(** Returns the number of fresh actlits created. *)
+val fresh_actlit_count: unit -> int
+
+(** Resets the counter for fresh actlits.
+    /!\ Might cause actlit clash in solvers. /!\ *)
+val reset_fresh_actlit: unit -> unit
+
 (* 
    Local Variables:
    compile-command: "make -C .. -k"

@@ -42,11 +42,6 @@ type mode_conj = mode list
 type mode_path = mode_conj list
 
 (*
-  A [witness] is a model and a [mode_path].
-*)
-type witness = model * mode_path
-
-(*
   Reversed partial tree for depth first search. Stores the activable modes at
   k and the witnesses for each path. The tree is partial because the witnesses
   for subtrees are collapsed into a single [Witnesses] leaf. The tree is
@@ -80,14 +75,13 @@ type rev_tree_adt =
 *)
 type t = {
   mode_to_term: mode -> term ;
-  mutable ws: witness list ;
   mutable tree: rev_tree_adt ;
 }
 
 (*
   Exception raised when [Top] is reached.
 *)
-exception TopReached of witness list
+exception TopReached
 
 (*
   Creates a reversed partial tree. [mode_conj] is a conjunction of modes
@@ -97,7 +91,7 @@ exception TopReached of witness list
   explored.
 *)
 let mk mode_to_term mode_conj =
-  { mode_to_term ; ws = [] ; tree = Node (Num.zero, Top, mode_conj, []) }
+  { mode_to_term; tree = Node (Num.zero, Top, mode_conj, []) }
 
 (*
   Returns the list of term the conjunction of which encodes the path of modes
@@ -140,10 +134,10 @@ let mode_path_of { tree } = mode_path_of_adt tree
   Used to check which modes can be activated to extend the path being currently
   explored.
 *)
-let path_of { ws ; mode_to_term ; tree } =
+let path_of { mode_to_term ; tree } =
   match tree with
   | Node _ -> term_of_path mode_to_term tree [] |> Term.mk_and
-  | Top -> TopReached ws |> raise
+  | Top -> raise TopReached
 
 (*
   Returns the term encoding the path of modes leading to the current node but
@@ -152,7 +146,7 @@ let path_of { ws ; mode_to_term ; tree } =
   Used when backtracking, to see if different modes can be activated at the
   current depth.
 *)
-let blocking_path_of { ws ; mode_to_term ; tree } =
+let blocking_path_of { mode_to_term ; tree } =
   match tree with
   | Node (k, kid, mode_conj, explored) ->
     mode_conj :: explored
@@ -161,55 +155,46 @@ let blocking_path_of { ws ; mode_to_term ; tree } =
       |> Term.mk_and |> Term.bump_state k |> Term.mk_not
     ) |> term_of_path mode_to_term kid (* Building path. *)
     |> Term.mk_and
-  | Top -> TopReached ws |> raise
+  | Top -> raise TopReached
 
 (*
   Depth of the current node of a tree.
 *)
-let depth_of { ws ; tree } = match tree with
+let depth_of { tree } = match tree with
 | Node (k, _, _, _) -> k
-| Top -> TopReached ws |> raise
+| Top -> raise TopReached
 
 (*
   Pushes a node on top of the current one, activating a mode conjunction.
 *)
-let push ({ ws ; tree } as t) mode_conj = match tree with
+let push ({ tree } as t) mode_conj = match tree with
 | Node (k, _, _, _) ->
   t.tree <- Node(Num.succ k, tree, mode_conj, [])
-| Top -> TopReached ws |> raise
+| Top -> raise TopReached
 
 (*
   Pops the current node.
 *)
-let pop ({ ws ; tree } as t) = match tree with
+let pop ({ tree } as t) = match tree with
 | Node (_, kid, _, _) -> t.tree <- kid
-| Top -> TopReached ws |> raise
+| Top -> raise TopReached
 
 (*
   Updates the current mode.
 *)
-let update ({ ws ; tree } as t) mode_conj = match tree with
+let update ({ tree } as t) mode_conj = match tree with
 | Node (k, kid, mode_conj', explored) ->
   t.tree <- Node (k, kid, mode_conj, mode_conj' :: explored)
-| Top  -> TopReached ws |> raise
-
-(*
-  Adds a witness for the current node.
-
-  Used when at maximal depth to store a witness.
-*)
-let add_witness ({ ws ; tree } as t) model =
-  t.ws <- ( model, (mode_path_of_adt tree) ) :: ws
+| Top  -> raise TopReached
 
 
 
 
 (* |===| Pretty printers. *)
-let pp_print_tree fmt ({ ws ; tree } as t) =
-  Format.fprintf fmt "@[<v>at %a, %d witnesses@]"
-    Num.pp_print_numeral (match tree with
-      | Top -> Num.zero | Node (k,_,_,_) -> k
-    ) (List.length ws)
+let pp_print_tree fmt ({ tree } as t) =
+  Format.fprintf fmt "@[<v>at %a@]" Num.pp_print_numeral (match tree with
+    | Top -> Num.zero | Node (k,_,_,_) -> k
+  )
 
 
 (* 

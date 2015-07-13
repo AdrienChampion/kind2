@@ -46,6 +46,9 @@ val mk: TransSys.t -> t
 (** Destroys the underlying solver. *)
 val rm: t -> unit
 
+(** Restarts a solver. *)
+val restart: t -> t
+
 (** Comment trace for the underlying solver. *)
 val comment: t -> string -> unit
 

@@ -40,11 +40,6 @@ type mode_conj = mode list
 type mode_path = mode_conj list
 
 (**
-  A [witness] is a model and a [mode_path].
-*)
-type witness = model * mode_path
-
-(**
   Stores the witnesses and the reversed tree.
   Also stores a mode to term function to construct constraints to activate or
   block mode paths / conjunctions of modes.
@@ -54,7 +49,7 @@ type t
 (**
   Exception raised when [Top] is reached.
 *)
-exception TopReached of witness list
+exception TopReached
 
 (**
   Creates a reversed partial tree. [mode_conj] is a conjunction of modes
@@ -106,13 +101,6 @@ val pop: t -> unit
   Updates the current mode.
 *)
 val update: t -> string list -> unit
-
-(**
-  Adds a witness for the current node.
-
-  Used when at maximal depth to store a witness.
-*)
-val add_witness: t -> model -> unit
 
 (**
   Quiet tree pretty printer.

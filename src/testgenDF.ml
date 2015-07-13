@@ -20,26 +20,30 @@ open Lib
 
 module Solver = TestgenSolver
 module Tree = TestgenTree
-module Sys = TransSys
+module TSys = TransSys
 module Num = Numeral
 
-
-
-(*
-  TODO:
-  Restart solver when too many actlits are created.
-  Log testcases for "online" behavior.
-*)
+module IO = TestgenIO
 
 
 (* Reference to the solver for clean exit. *)
 let solver_ref = ref None
 
+(* IO context ref. *)
+let io_ref = ref None
+
+(* Number of restarts performed. *)
+let restart_count_ref = ref 0
+
 (* Destroys the solver reference if any. *)
 let on_exit _ =
-  match !solver_ref with
-  | None -> ()
-  | Some solver -> Solver.rm solver
+  ( match !solver_ref with
+    | None -> ()
+    | Some solver -> Solver.rm solver ) ;
+  ( match !io_ref with
+    | None -> ()
+    | Some io -> IO.rm io ) ;
+  ()
 
 let get_model = SMTSolver.get_model
 
@@ -54,7 +58,7 @@ let active_modes_of_map map =
       (pp_print_list Format.pp_print_string "@,") active ;
     active
 
-let rec enumerate solver tree modes contract_term =
+let rec enumerate io solver tree modes contract_term =
   Format.printf "@.enumerate@." ;
   Solver.comment solver "enumerate" ;
   let rec loop () =
@@ -70,7 +74,8 @@ let rec enumerate solver tree modes contract_term =
     | Some (map, model) ->
       (* Extracting modes activated @k by the model. *)
       active_modes_of_map map |> Tree.update tree ;
-      Tree.add_witness tree model ;
+      let modes = Tree.mode_path_of tree in
+      IO.testcase_to_xml io modes model k ;
       loop ()
     | None -> ()
   in
@@ -88,18 +93,29 @@ let rec enumerate solver tree modes contract_term =
   | Some (map, model) ->
     (* Extracting modes activated @k by the model. *)
     active_modes_of_map map |> Tree.push tree ;
-    Tree.add_witness tree model ;
+    let modes_str = Tree.mode_path_of tree in
+    IO.testcase_to_xml io modes_str model k ;
     (* Enumerating the other mode conjunctions from the path. *)
     loop () ;
     (* Let's go backward now. *)
-    backward solver tree modes contract_term
+    backward io solver tree modes contract_term
   | None ->
     (* If we get unsat right away then something's wrong. *)
     failwith "unsat"
 
 
 
-and forward solver tree modes contract_term =
+and forward io solver tree modes contract_term =
+  (* Resetting if too many fresh actlits have been created. *)
+  let solver = if Actlit.fresh_actlit_count () > 500 then (
+      Format.printf "|===| Restarting solver.@." ;
+      Actlit.reset_fresh_actlit () ;
+      let solver = Solver.restart solver in
+      solver_ref := Some solver ;
+      restart_count_ref := !restart_count_ref + 1 ;
+      solver
+    ) else solver
+  in
   Format.printf "@.forward@." ;
   Solver.comment solver "forward" ;
   let rec loop () =
@@ -124,9 +140,9 @@ and forward solver tree modes contract_term =
   (* Going forward. *)
   loop () ;
   (* Max depth reached, enumerate reachable modes. *)
-  enumerate solver tree modes contract_term
+  enumerate io solver tree modes contract_term
 
-and backward solver tree modes contract_term =
+and backward io solver tree modes contract_term =
   Format.printf "@.backward@." ;
   Solver.comment solver "backward" ;
   Format.printf "  tree: %a@." Tree.pp_print_tree tree ;
@@ -151,7 +167,7 @@ and backward solver tree modes contract_term =
   (* Going backwards. *)
   loop () ;
   (* Found a different path, going forward now. *)
-  forward solver tree modes contract_term
+  forward io solver tree modes contract_term
 
 
 (* Entry point. *)
@@ -162,14 +178,26 @@ let main sys =
   (* Memorizing solver for clean exit. *)
   solver_ref := Some solver ;
 
+  (* Creating system directory if needed. *)
+  let root =
+    Format.sprintf "%s/%s"
+      (Flags.testgen_out_dir ()) (TSys.get_scope sys |> String.concat ".")
+  in
+  ( try if Sys.is_directory root |> not then assert false else ()
+    with e -> Unix.mkdir root 0o740 ) ;
+
+  (* Creating io context. *)
+  let io = IO.mk sys root "unit" "unit tests" in
+  io_ref := Some io ;
+
   (* Getting global contracts and modes association lists. *)
   let global, modes =
-    Sys.get_contracts sys
+    TSys.get_contracts sys
     |> List.fold_left (fun (g,m) (_, sv, name) ->
       let pair =
         name, Var.mk_state_var_instance sv Numeral.zero |> Term.mk_var
       in
-      match Sys.contract_is_global sys name with
+      match TSys.contract_is_global sys name with
       | Some true -> (pair :: g), m
       | Some false -> g, (pair ::m)
       | None -> failwith "unreachable"
@@ -211,10 +239,14 @@ let main sys =
 
   Format.printf "depth is %a@." Num.pp_print_numeral (Tree.depth_of tree) ;
 
-  ( try forward solver tree modes mode_term with
-    | TestgenTree.TopReached ws -> Format.printf "done@." ) ;
+  ( try forward io solver tree modes mode_term with
+    | TestgenTree.TopReached -> Format.printf "done@." ) ;
 
   Format.printf "Tree: %a@." Tree.pp_print_tree tree ;
+
+  Format.printf "@.|===| %d restarts@.@." !restart_count_ref ;
+
+  Format.printf "@.|===| %d testcases generated@.@." (IO.testcase_count io) ;
 
   ()
 

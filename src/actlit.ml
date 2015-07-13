@@ -63,6 +63,13 @@ let fresh_actlit () =
 let term_of_actlit actlit =
   Term.mk_uf actlit []
 
+(* Returns the number of fresh actlits created. *)
+let fresh_actlit_count () = !i
+
+(* Resets the counter for fresh actlits.
+   /!\ Might cause actlit clash in solvers. *)
+let reset_fresh_actlit () = i := 0
+
 (* 
    Local Variables:
    compile-command: "make -C .. -k"
