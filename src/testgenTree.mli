@@ -29,10 +29,10 @@ type depth = num
 type mode = string
 
 (**
-  A conjunction of modes. Several can be activated at the same time and
-  represent different paths.
+  A conjunction of modes. First are the modes activated, then come the mode
+  deactivated.
 *)
-type mode_conj = mode list
+type mode_conj = (mode list) * (mode list)
 
 (**
   A [mode_path] stores the modes activated by the path in reverse order.
@@ -58,12 +58,12 @@ exception TopReached
   Originally there are no witnesses, some initial state mode, and no modes
   explored.
 *)
-val mk: (string -> term) -> string list -> t
+val mk: (string -> term) -> mode_conj -> t
 
 (**
   Returns the list of mode conjunctions corresponding to a partial tree.
 *)
-val mode_path_of: t -> string list list
+val mode_path_of: t -> mode_path
 
 (**
   Returns the term encoding the path of modes represented by a tree.
@@ -90,7 +90,7 @@ val depth_of: t -> num
 (**
   Pushes a node on top of the current one, activating a mode conjunction.
 *)
-val push: t -> string list -> unit
+val push: t -> mode_conj -> unit
 
 (**
   Pops the current node.
@@ -100,7 +100,7 @@ val pop: t -> unit
 (**
   Updates the current mode.
 *)
-val update: t -> string list -> unit
+val update: t -> mode_conj -> unit
 
 (**
   Quiet tree pretty printer.

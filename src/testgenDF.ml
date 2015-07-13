@@ -26,6 +26,11 @@ module N = LustreNode
 
 module IO = TestgenIO
 
+(** TODO:
+  in case of unsat in forward or at the beginning of enumerate, log error in
+  - [<name>_errors/error_<n>.csv] (concrete trace),
+  - [<name>_errors.xml] (mode abstraction). *)
+
 
 (* Reference to the solver for clean exit. *)
 let solver_ref = ref None
@@ -51,13 +56,13 @@ let get_model = SMTSolver.get_model
 let unit_of _ = ()
 
 let active_modes_of_map map =
-  List.fold_left (fun modes (m,v) ->
-    if v == Term.t_true then m :: modes else modes
-  ) [] map
-  |> fun active ->
+  List.fold_left (fun (act,deact) (m,v) ->
+    if v == Term.t_true then m :: act, deact else act, m :: deact
+  ) ([],[]) map
+  |> fun (act,deact) ->
     Format.printf "  active: @[<v>%a@]@."
-      (pp_print_list Format.pp_print_string "@,") active ;
-    active
+      (pp_print_list Format.pp_print_string "@,") act ;
+    act, deact
 
 let rec enumerate io solver tree modes contract_term =
   Format.printf "@.enumerate@." ;
@@ -75,7 +80,7 @@ let rec enumerate io solver tree modes contract_term =
     | Some (map, model) ->
       (* Extracting modes activated @k by the model. *)
       active_modes_of_map map |> Tree.update tree ;
-      let modes = Tree.mode_path_of tree in
+      let modes = Tree.mode_path_of tree |> List.map fst in
       IO.testcase_to_xml io modes model k ;
       loop ()
     | None -> ()
@@ -88,13 +93,13 @@ let rec enumerate io solver tree modes contract_term =
   Format.printf "  at %a@." Num.pp_print_numeral k ;
   let modes' = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
   let contract_term' = Term.bump_state k contract_term in
-  let mode_path = Term.mk_and [ Tree.path_of tree ; contract_term' ] in
+  let mode_path = Term.mk_and [ contract_term' ; Tree.path_of tree ] in
 
   match Solver.checksat solver k mode_path [] modes' get_model with
   | Some (map, model) ->
     (* Extracting modes activated @k by the model. *)
     active_modes_of_map map |> Tree.push tree ;
-    let modes_str = Tree.mode_path_of tree in
+    let modes_str = Tree.mode_path_of tree |> List.map fst in
     IO.testcase_to_xml io modes_str model k ;
     (* Enumerating the other mode conjunctions from the path. *)
     loop () ;
@@ -128,7 +133,7 @@ and forward io solver tree modes contract_term =
       Format.printf "  at %a@." Num.pp_print_numeral k ;
       let modes = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
       let contract_term = Term.bump_state k contract_term in
-      let mode_path = Term.mk_and [ Tree.path_of tree ; contract_term ] in
+      let mode_path = Term.mk_and [ contract_term ; Tree.path_of tree ] in
 
       match Solver.checksat solver k mode_path [] modes unit_of with
       | Some (map,()) ->
@@ -154,7 +159,7 @@ and backward io solver tree modes contract_term =
     let modes = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
     let contract_term = Term.bump_state k contract_term in
     let mode_path =
-      Term.mk_and [ Tree.blocking_path_of tree ; contract_term ]
+      Term.mk_and [ contract_term ; Tree.blocking_path_of tree ]
     in
 
     match Solver.checksat solver k mode_path [] modes unit_of with
@@ -187,6 +192,7 @@ let main sys =
   IO.mk_dir root ;
 
   Format.printf "generating oracle@." ;
+  (* |===| Begin messy temporary stuff to generate outputs for each mode. *)
   let nodes = match TransSys.get_source sys with
     | TransSys.Lustre nodes -> nodes
     | TransSys.Native -> assert false
@@ -242,6 +248,7 @@ let main sys =
           (c, mk_out_ident c.N.name, mk_and c.N.enss) :: l
       )
   in
+  (* |===| End of messy stuff. *)
   let oracle_path =
     List.map (fun (_,s,t) -> s, t) contracts |> IO.generate_oracles sys root
   in

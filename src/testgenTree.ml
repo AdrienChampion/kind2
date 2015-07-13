@@ -31,10 +31,10 @@ type depth = num
 type mode = string
 
 (*
-  A conjunction of modes. Several can be activated at the same time and
-  represent different paths.
+  A conjunction of modes. First are the modes activated, then come the mode
+  deactivated.
 *)
-type mode_conj = mode list
+type mode_conj = (mode list) * (mode list)
 
 (*
   A [mode_path] stores the modes activated by the path in reverse order.
@@ -93,6 +93,14 @@ exception TopReached
 let mk mode_to_term mode_conj =
   { mode_to_term; tree = Node (Num.zero, Top, mode_conj, []) }
 
+(* Creates the term associated to a mode conjunction. *)
+let term_of_mode_conj mode_to_term k (act, deact) =
+  List.rev_append
+    ( act |> List.map (fun m -> mode_to_term m |> Term.bump_state k) )
+    ( deact |> List.map (fun m ->
+        mode_to_term m |> Term.bump_state k |> Term.mk_not) )
+  |> Term.mk_and
+
 (*
   Returns the list of term the conjunction of which encodes the path of modes
   leading to the current node, including the current node.
@@ -102,11 +110,7 @@ let mk mode_to_term mode_conj =
 let term_of_path mode_to_term tree =
   let rec loop tree conj = match tree with
     | Node (k, kid, mode_conj, _) ->
-      let mode_at_k = (* Building constraint for this node. *)
-        mode_conj
-        |> List.map (fun m -> mode_to_term m |> Term.bump_state k)
-        |> Term.mk_and
-      in
+      let mode_at_k = term_of_mode_conj mode_to_term k mode_conj in
       mode_at_k :: conj |> loop kid (* Looping. *)
     | Top -> (* Reversing for readability. *)
       List.rev conj
@@ -151,8 +155,7 @@ let blocking_path_of { mode_to_term ; tree } =
   | Node (k, kid, mode_conj, explored) ->
     mode_conj :: explored
     |> List.map (fun mode_conj -> (* Negating each mode conjunction. *)
-      mode_conj |> List.map mode_to_term
-      |> Term.mk_and |> Term.bump_state k |> Term.mk_not
+      term_of_mode_conj mode_to_term k mode_conj |> Term.mk_not
     ) |> term_of_path mode_to_term kid (* Building path. *)
     |> Term.mk_and
   | Top -> raise TopReached
@@ -192,9 +195,15 @@ let update ({ tree } as t) mode_conj = match tree with
 
 (* |===| Pretty printers. *)
 let pp_print_tree fmt ({ tree } as t) =
-  Format.fprintf fmt "@[<v>at %a@]" Num.pp_print_numeral (match tree with
-    | Top -> Num.zero | Node (k,_,_,_) -> k
-  )
+  Format.fprintf fmt "@[<v>at %a () %a@]"
+    Num.pp_print_numeral (match tree with
+      | Top -> Num.zero | Node (k,_,_,_) -> k
+    )
+    (fun fmt (act,_) ->
+      Format.fprintf fmt "%a"
+        (pp_print_list Format.pp_print_string ", ") act)
+    (match tree with
+      | Top -> ["top"], [] | Node(_,_,c,_) -> c)
 
 
 (* 
