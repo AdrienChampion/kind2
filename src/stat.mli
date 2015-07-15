@@ -318,6 +318,15 @@ val testgen_deadlocks: int_item
 (* Number of restarts performed. *)
 val testgen_restarts: int_item
 
+(** Time spent going forward. *)
+val testgen_forward_time: float_item
+
+(** Time spent going backward. *)
+val testgen_backward_time: float_item
+
+(** Time spent enumerating. *)
+val testgen_enumerate_time: float_item
+
 (* Total runtime for testgen. *)
 val testgen_total_time: float_item
 

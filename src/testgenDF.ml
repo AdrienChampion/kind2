@@ -73,6 +73,7 @@ type result = Ok | Deadlock
 
 let rec enumerate io solver tree modes contract_term =
   Format.printf "@.enumerate@." ;
+  Stat.start_timer Stat.testgen_enumerate_time ;
   Solver.comment solver "enumerate" ;
   let rec loop () =
     Format.printf "  tree: %a@." Tree.pp_print_tree tree ;
@@ -120,12 +121,14 @@ let rec enumerate io solver tree modes contract_term =
         | Some (_, model) ->
           let modes_str = Tree.mode_path_of tree |> List.map fst in
           IO.log_deadlock io modes_str model k ) ) ;
+  Stat.record_time Stat.testgen_enumerate_time ;
   (* Let's go backward now. *)
   backward io solver tree modes contract_term
 
 
 
 and forward io solver tree modes contract_term =
+  Stat.start_timer Stat.testgen_forward_time ;
   (* Resetting if too many fresh actlits have been created. *)
   let solver = if Actlit.fresh_actlit_count () >= 500 then (
       Stat.incr Stat.testgen_restarts ;
@@ -168,6 +171,7 @@ and forward io solver tree modes contract_term =
         Deadlock
     ) else Ok
   in
+  Stat.record_time Stat.testgen_forward_time ;
   (* Going forward. *)
   match loop () with
   | Ok ->
@@ -178,6 +182,8 @@ and forward io solver tree modes contract_term =
     backward io solver tree modes contract_term
 
 and backward io solver tree modes contract_term =
+  Stat.update_time Stat.testgen_total_time ;
+  Stat.start_timer Stat.testgen_backward_time ;
   Format.printf "@.backward@." ;
   Solver.comment solver "backward" ;
   Format.printf "  tree: %a@." Tree.pp_print_tree tree ;
@@ -201,6 +207,7 @@ and backward io solver tree modes contract_term =
   in
   (* Going backwards. *)
   loop () ;
+  Stat.record_time Stat.testgen_backward_time ;
   (* Found a different path, going forward now. *)
   forward io solver tree modes contract_term
 
@@ -338,8 +345,12 @@ let main sys =
 
   Format.printf "depth is %a@." Num.pp_print_numeral (Tree.depth_of tree) ;
 
+  (* Starting the timer. *)
+  Stat.start_timer Stat.testgen_total_time ;
+
   ( try forward io solver tree modes mode_term with
     | TestgenTree.TopReached -> Format.printf "done@." ) ;
+  Stat.record_time Stat.testgen_total_time ;
 
   Format.printf "Tree: %a@." Tree.pp_print_tree tree ;
 
