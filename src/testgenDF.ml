@@ -109,9 +109,8 @@ let rec enumerate io solver tree modes contract_term =
     | None ->
       (* If we get unsat right away then it's a deadlock. *)
       Format.printf "  deadlock@." ;
-      ( match
-          Solver.checksat solver (Num.pred k) mode_path [] [] get_model
-        with
+      let k = Num.pred k in
+      ( match Solver.checksat solver k mode_path [] [] get_model with
         | None -> assert false
         | Some (_, model) ->
           let modes_str = Tree.mode_path_of tree |> List.map fst in
@@ -154,9 +153,8 @@ and forward io solver tree modes contract_term =
       | None ->
         (* Deadlock. *)
         Format.printf "  deadlock@." ;
-        ( match
-            Solver.checksat solver (Num.pred k) mode_path [] [] get_model
-          with
+        let k = Num.pred k in
+        ( match Solver.checksat solver k mode_path [] [] get_model with
           | None -> assert false
           | Some (_, model) ->
             let modes_str = Tree.mode_path_of tree |> List.map fst in
