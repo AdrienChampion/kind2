@@ -26,11 +26,6 @@ module N = LustreNode
 
 module IO = TestgenIO
 
-(** TODO:
-  in case of unsat in forward or at the beginning of enumerate, log error in
-  - [<name>_errors/error_<n>.csv] (concrete trace),
-  - [<name>_errors.xml] (mode abstraction). *)
-
 
 (* Reference to the solver for clean exit. *)
 let solver_ref = ref None
@@ -41,8 +36,18 @@ let io_ref = ref None
 (* Number of restarts performed. *)
 let restart_count_ref = ref 0
 
+(* Output statistics *)
+let print_stats () = Event.stat [
+  Stat.misc_stats_title, Stat.misc_stats ;
+  Stat.testgen_stats_title, Stat.testgen_stats ;
+  Stat.smt_stats_title, Stat.smt_stats
+]
+
 (* Destroys the solver reference if any. *)
 let on_exit _ =
+  Stat.testgen_stop_timers () ;
+  Stat.smt_stop_timers () ;
+  print_stats () ;
   ( match !solver_ref with
     | None -> ()
     | Some solver -> Solver.rm solver ) ;
@@ -123,6 +128,7 @@ let rec enumerate io solver tree modes contract_term =
 and forward io solver tree modes contract_term =
   (* Resetting if too many fresh actlits have been created. *)
   let solver = if Actlit.fresh_actlit_count () >= 500 then (
+      Stat.incr Stat.testgen_restarts ;
       Format.printf "|===| Restarting solver.@." ;
       Actlit.reset_fresh_actlit () ;
       let solver = Solver.restart solver in
@@ -201,6 +207,9 @@ and backward io solver tree modes contract_term =
 
 (* Entry point. *)
 let main sys =
+
+  (* Starting the timer. *)
+  Stat.start_timer Stat.testgen_total_time ;
 
   (* Creating solver. *)
   let solver = Solver.mk sys in

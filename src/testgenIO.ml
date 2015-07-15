@@ -203,6 +203,7 @@ let pp_print_model_path fmt path =
 
 (* Logs a test case. *)
 let log_testcase t modes model k =
+  Stat.incr Stat.testgen_testcases ;
   Format.printf "  log_testcase@." ;
 
   (* |===| Logging testcase. *)
@@ -230,6 +231,7 @@ let log_testcase t modes model k =
 
 (* Logs a test case. *)
 let rec log_deadlock t modes model k =
+  Stat.incr Stat.testgen_deadlocks ;
   match t.error_file with
   | None -> init_error t ; log_deadlock t modes model k
   | Some error_file ->

@@ -307,6 +307,32 @@ val invgengraph_ts_stop_timers : unit -> unit
 (** Pretty-print INVGENTS statistics items *)
 val pp_print_invgengraph_ts_stats : Format.formatter -> unit
 
+(** {2 Testgen} *)
+
+(* Number of testcases generated. *)
+val testgen_testcases: int_item
+
+(* Number of deadlocks found. *)
+val testgen_deadlocks: int_item
+
+(* Number of restarts performed. *)
+val testgen_restarts: int_item
+
+(* Total runtime for testgen. *)
+val testgen_total_time: float_item
+
+(* Title for testgen statistics *)
+val testgen_stats_title: string
+
+(* All testgen statistics *)
+val testgen_stats: stat_item list
+
+(* Stop and record all times *)
+val testgen_stop_timers: unit -> unit
+
+(* Pretty-print testgen statistics items *)
+val pp_print_testgen_stats: Format.formatter -> unit
+
 (** {2 SMT} *)
 
 (** Time in check-sat calls *)
