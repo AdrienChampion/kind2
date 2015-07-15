@@ -171,7 +171,7 @@ let pp_print_tc fmt path name modes =
   Format.fprintf fmt
     "  <testcase path=\"%s\" name=\"%s\" format=\"csv\">@." path name ;
   List.rev modes |> loop 0 ;
-  Format.fprintf fmt "  </testcase>@.@."
+  Format.fprintf fmt "  </testcase>@.@.@?"
 
 (* Pretty printer for a deadlock in xml. *)
 let pp_print_deadlock fmt path name modes =
@@ -187,7 +187,7 @@ let pp_print_deadlock fmt path name modes =
   Format.fprintf fmt
     "  <deadlock path=\"%s\" name=\"%s\" format=\"csv\">@." path name ;
   List.rev modes |> loop 0 ;
-  Format.fprintf fmt "  </deadlock>@.@."
+  Format.fprintf fmt "  </deadlock>@.@.@?"
 
 (* Pretty printer for a model path in dot. *)
 let pp_print_model_path fmt path =
@@ -197,7 +197,7 @@ let pp_print_model_path fmt path =
         (pp_print_list Format.pp_print_string "__") modes cpt
         (pp_print_list Format.pp_print_string "__") modes' (cpt + 1) ;
       loop (cpt + 1) (modes' :: tail)
-    | _ -> Format.fprintf fmt "@,@?"
+    | _ -> Format.fprintf fmt "@.@?"
   in
   List.rev path |> loop 0
 
