@@ -64,6 +64,8 @@ let active_modes_of_map map =
       (pp_print_list Format.pp_print_string "@,") act ;
     act, deact
 
+type result = Ok | Deadlock
+
 let rec enumerate io solver tree modes contract_term =
   Format.printf "@.enumerate@." ;
   Solver.comment solver "enumerate" ;
@@ -73,7 +75,7 @@ let rec enumerate io solver tree modes contract_term =
     let modes = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
     let contract_term = Term.bump_state k contract_term in
     let mode_path =
-      Term.mk_and [ Tree.blocking_path_of tree ; contract_term ]
+      Term.mk_and [ contract_term ; Tree.blocking_path_of tree ]
     in
 
     match Solver.checksat solver k mode_path [] modes get_model with
@@ -81,7 +83,7 @@ let rec enumerate io solver tree modes contract_term =
       (* Extracting modes activated @k by the model. *)
       active_modes_of_map map |> Tree.update tree ;
       let modes = Tree.mode_path_of tree |> List.map fst in
-      IO.testcase_to_xml io modes model k ;
+      IO.log_testcase io modes model k ;
       loop ()
     | None -> ()
   in
@@ -93,27 +95,35 @@ let rec enumerate io solver tree modes contract_term =
   Format.printf "  at %a@." Num.pp_print_numeral k ;
   let modes' = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
   let contract_term' = Term.bump_state k contract_term in
-  let mode_path = Term.mk_and [ contract_term' ; Tree.path_of tree ] in
+  let mode_path = Tree.path_of tree in
+  let term = Term.mk_and [ contract_term' ; mode_path ] in
 
-  match Solver.checksat solver k mode_path [] modes' get_model with
-  | Some (map, model) ->
-    (* Extracting modes activated @k by the model. *)
-    active_modes_of_map map |> Tree.push tree ;
-    let modes_str = Tree.mode_path_of tree |> List.map fst in
-    IO.testcase_to_xml io modes_str model k ;
-    (* Enumerating the other mode conjunctions from the path. *)
-    loop () ;
-    (* Let's go backward now. *)
-    backward io solver tree modes contract_term
-  | None ->
-    (* If we get unsat right away then something's wrong. *)
-    failwith "unsat"
+  ( match Solver.checksat solver k term [] modes' get_model with
+    | Some (map, model) ->
+      (* Extracting modes activated @k by the model. *)
+      active_modes_of_map map |> Tree.push tree ;
+      let modes_str = Tree.mode_path_of tree |> List.map fst in
+      IO.log_testcase io modes_str model k ;
+      (* Enumerating the other mode conjunctions from the path. *)
+      loop ()
+    | None ->
+      (* If we get unsat right away then it's a deadlock. *)
+      Format.printf "  deadlock@." ;
+      ( match
+          Solver.checksat solver (Num.pred k) mode_path [] [] get_model
+        with
+        | None -> assert false
+        | Some (_, model) ->
+          let modes_str = Tree.mode_path_of tree |> List.map fst in
+          IO.log_deadlock io modes_str model k ) ) ;
+  (* Let's go backward now. *)
+  backward io solver tree modes contract_term
 
 
 
 and forward io solver tree modes contract_term =
   (* Resetting if too many fresh actlits have been created. *)
-  let solver = if Actlit.fresh_actlit_count () > 500 then (
+  let solver = if Actlit.fresh_actlit_count () >= 500 then (
       Format.printf "|===| Restarting solver.@." ;
       Actlit.reset_fresh_actlit () ;
       let solver = Solver.restart solver in
@@ -133,20 +143,35 @@ and forward io solver tree modes contract_term =
       Format.printf "  at %a@." Num.pp_print_numeral k ;
       let modes = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
       let contract_term = Term.bump_state k contract_term in
-      let mode_path = Term.mk_and [ contract_term ; Tree.path_of tree ] in
+      let mode_path = Tree.path_of tree in
+      let term = Term.mk_and [ contract_term ; mode_path ] in
 
-      match Solver.checksat solver k mode_path [] modes unit_of with
+      match Solver.checksat solver k term [] modes unit_of with
       | Some (map,()) ->
         (* Extracting modes activated @k by the model. *)
         active_modes_of_map map |> Tree.push tree ;
         loop ()
-      | None -> failwith "unsat"
-    )
+      | None ->
+        (* Deadlock. *)
+        Format.printf "  deadlock@." ;
+        ( match
+            Solver.checksat solver (Num.pred k) mode_path [] [] get_model
+          with
+          | None -> assert false
+          | Some (_, model) ->
+            let modes_str = Tree.mode_path_of tree |> List.map fst in
+            IO.log_deadlock io modes_str model k ) ;
+        Deadlock
+    ) else Ok
   in
   (* Going forward. *)
-  loop () ;
-  (* Max depth reached, enumerate reachable modes. *)
-  enumerate io solver tree modes contract_term
+  match loop () with
+  | Ok ->
+    (* Max depth reached, enumerate reachable modes. *)
+    enumerate io solver tree modes contract_term
+  | Deadlock ->
+    (* Deadlock found, going backward. *)
+    backward io solver tree modes contract_term
 
 and backward io solver tree modes contract_term =
   Format.printf "@.backward@." ;
@@ -311,9 +336,11 @@ let main sys =
 
   Format.printf "Tree: %a@." Tree.pp_print_tree tree ;
 
-  Format.printf "@.|===| %d restarts@.@." !restart_count_ref ;
+  Format.printf "@.|===| %d restarts@." !restart_count_ref ;
 
-  Format.printf "@.|===| %d testcases generated@.@." (IO.testcase_count io) ;
+  Format.printf "@.|===| %d testcases generated@." (IO.testcase_count io) ;
+
+  Format.printf "@.|===| %d deadlocks found@.@." (IO.error_count io) ;
 
   ()
 

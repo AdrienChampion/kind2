@@ -172,7 +172,7 @@ let depth_of { tree } = match tree with
 *)
 let push ({ tree } as t) mode_conj = match tree with
 | Node (k, _, _, _) ->
-  t.tree <- Node(Num.succ k, tree, mode_conj, [])
+  t.tree <- Node (Num.succ k, tree, mode_conj, [])
 | Top -> raise TopReached
 
 (*
@@ -195,9 +195,9 @@ let update ({ tree } as t) mode_conj = match tree with
 
 (* |===| Pretty printers. *)
 let pp_print_tree fmt ({ tree } as t) =
-  Format.fprintf fmt "@[<v>at %a () %a@]"
+  Format.fprintf fmt "@[<v>at %a (%a)@]"
     Num.pp_print_numeral (match tree with
-      | Top -> Num.zero | Node (k,_,_,_) -> k
+      | Top -> Num.(~- one) | Node (k,_,_,_) -> k
     )
     (fun fmt (act,_) ->
       Format.fprintf fmt "%a"

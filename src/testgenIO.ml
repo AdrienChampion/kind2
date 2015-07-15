@@ -37,12 +37,18 @@ type t = {
   sys: sys ;
   (* Counter for test case uid. *)
   mutable uid: int ;
+  (* Counter for error uid. *)
+  mutable euid: int ;
   (* Directory to log the testcases in. *)
   dir: string ;
   (* XML class file. *)
   class_file: file ;
   (* Graph file. *)
   graph_file: file ;
+  (* Error dir. *)
+  edir: string ;
+  (* Error file. *)
+  mutable error_file: file option ;
 }
 
 let openfile path = Unix.openfile path [
@@ -59,6 +65,7 @@ let fmt_of_file file =
 let mk sys root name title =
   (* |===| Testcases directory. *)
   let dir = Format.sprintf "%s/%s" root name in
+  let edir = Format.sprintf "%s/errors" dir in
   mk_dir dir ;
 
   (* |===| XML class file. *)
@@ -80,29 +87,62 @@ let mk sys root name title =
   Format.fprintf graph_fmt "strict digraph mode_graph {@.@.@?" ;
 
   (* Building result. *)
-  { sys ; uid = 0 ; dir ;
+  { sys ; uid = 0 ; euid = 0 ; dir ;
     class_file = class_file ;
-    graph_file = graph_file ; }
+    graph_file = graph_file ;
+    edir ; error_file = None ; }
+
+(* Initialization for error dir and file. *)
+let init_error ({ sys ; dir ; edir } as t) =
+  ( if t.error_file <> None then
+      failwith "init_error called with existing error file" ) ;
+  mk_dir edir ;
+  let error_file = Format.sprintf "%s-errors.xml" dir |> openfile in
+  let error_fmt = fmt_of_file error_file in
+  Format.fprintf error_fmt
+    "<?xml version=\"1.0\"?>@.\
+     <data system=\"%s\">@.@.@?"
+    (TransSys.get_scope sys |> String.concat ".") ;
+
+  t.error_file <- Some error_file
 
 
 (* Closes internal file descriptors. *)
-let rm { class_file ; graph_file } =
+let rm { class_file ; graph_file ; error_file } =
   (* |===| Finishing class file. *)
   let class_fmt = fmt_of_file class_file in
   Format.fprintf class_fmt "@.</data>@.@?" ;
   (* |===| Finishing graph file. *)
   let graph_fmt = fmt_of_file graph_file in
   Format.fprintf graph_fmt "}@.@?" ;
-  Unix.close class_file ; Unix.close graph_file
+  Unix.close class_file ; Unix.close graph_file ;
+  (* |===| Finishing error file. *)
+  ( match error_file with
+    | None -> ()
+    | Some error_file ->
+      let error_fmt = fmt_of_file error_file in
+      Format.fprintf error_fmt "@.</data>@.@?" ;
+      Unix.close error_file ) ;
+  ()
 
 (* The number of testcases generated. *)
 let testcase_count { uid } = uid
 
-(* Formatter for a testcase file. *)
-let testcase_file ({uid ; dir} as t) =
+(* The number of errors logged. *)
+let error_count { euid } = euid
+
+(* Descriptor for a testcase file. *)
+let testcase_csv ({uid ; dir} as t) =
   let name = Format.sprintf "testcase_%d" uid in
   let path = Format.sprintf "%s/%s.csv" dir name in
   t.uid <- uid + 1 ;
+  name, path, openfile path
+
+(* Descriptor for an error file. *)
+let error_csv ({euid ; edir} as t) =
+  let name = Format.sprintf "error_%d" euid in
+  let path = Format.sprintf "%s/%s.csv" edir name in
+  t.euid <- euid + 1 ;
   name, path, openfile path
 
 (* Converts a model to the system's input values in csv. *)
@@ -133,6 +173,22 @@ let pp_print_tc fmt path name modes =
   List.rev modes |> loop 0 ;
   Format.fprintf fmt "  </testcase>@.@."
 
+(* Pretty printer for a deadlock in xml. *)
+let pp_print_deadlock fmt path name modes =
+  let rec loop cpt = function
+    | modes :: tail ->
+      Format.fprintf fmt
+        "    at step %d, activates @[<v>%a@]@." cpt
+        (pp_print_list Format.pp_print_string " and ")
+        modes ;
+      loop (cpt + 1) tail
+    | [] -> Format.fprintf fmt "    deadlock reached@."
+  in
+  Format.fprintf fmt
+    "  <deadlock path=\"%s\" name=\"%s\" format=\"csv\">@." path name ;
+  List.rev modes |> loop 0 ;
+  Format.fprintf fmt "  </deadlock>@.@."
+
 (* Pretty printer for a model path in dot. *)
 let pp_print_model_path fmt path =
   let rec loop cpt = function
@@ -146,12 +202,12 @@ let pp_print_model_path fmt path =
   List.rev path |> loop 0
 
 (* Logs a test case. *)
-let testcase_to_xml t modes model k =
-  Format.printf "testcase_to_xml@." ;
+let log_testcase t modes model k =
+  Format.printf "  log_testcase@." ;
 
   (* |===| Logging testcase. *)
-  Format.printf "  logging testcase@." ;
-  let name, path, tc_file = testcase_file t in
+  Format.printf "    logging testcase@." ;
+  let name, path, tc_file = testcase_csv t in
   let tc_fmt = fmt_of_file tc_file in
   (* Logging test case. *)
   cex_to_inputs_csv tc_fmt t.sys model k ;
@@ -161,16 +217,41 @@ let testcase_to_xml t modes model k =
   Unix.close tc_file ;
 
   (* |===| Updating class file. *)
-  Format.printf "  updating class file@." ;
+  Format.printf "    updating class file@." ;
   let class_fmt = fmt_of_file t.class_file in
   pp_print_tc class_fmt path name modes ;
 
   (* |===| Updating graph. *)
-  Format.printf "  updating graph@." ;
+  Format.printf "    updating graph@." ;
   let graph_fmt = fmt_of_file t.graph_file in
   pp_print_model_path graph_fmt modes ;
 
   ()
+
+(* Logs a test case. *)
+let rec log_deadlock t modes model k =
+  match t.error_file with
+  | None -> init_error t ; log_deadlock t modes model k
+  | Some error_file ->
+    Format.printf "  log_deadlock@." ;
+
+    (* |===| Logging error. *)
+    Format.printf "    logging deadlock@." ;
+    let name, path, e_file = error_csv t in
+    let e_fmt = fmt_of_file e_file in
+    (* Logging test case. *)
+    cex_to_inputs_csv e_fmt t.sys model k ;
+    (* Flushing. *)
+    Format.fprintf e_fmt "@?" ;
+    (* Close file. *)
+    Unix.close e_file ;
+
+    (* |===| Updating class file. *)
+    Format.printf "    updating error file@." ;
+    let error_fmt = fmt_of_file error_file in
+    pp_print_deadlock error_fmt path name modes ;
+
+    ()
 
 
 (* |===| Oracle generation. *)

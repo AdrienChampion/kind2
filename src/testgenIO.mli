@@ -37,10 +37,18 @@ val rm: t -> unit
 (** The number of testcases generated. *)
 val testcase_count: t -> int
 
-(** [testcase_to_xml t modes model k] logs a test case of length [k]
+(** The number of errors generated. *)
+val error_count: t -> int
+
+(** [log_testcase t modes model k] logs a test case of length [k]
     represented by model [model] and activating modes [modes] using the info
     in [t]. *)
-val testcase_to_xml: t -> string list list -> Model.t -> Numeral.t -> unit
+val log_testcase: t -> string list list -> Model.t -> Numeral.t -> unit
+
+(** [log_deadlock t modes model k] logs a deadlock trace of length [k]
+    represented by model [model] and activating modes [modes] using the info
+    in [t]. *)
+val log_deadlock: t -> string list list -> Model.t -> Numeral.t -> unit
 
 (* Generates an oracle for the top system of [sys]. The inputs will be the
    inputs and outputs of [sys]. [terms] is a list of [string * Term.t] of

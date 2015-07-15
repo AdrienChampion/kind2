@@ -168,8 +168,9 @@ let checksat ({ solver } as t) n term actlits terms f =
     (* If sat. *)
     ( fun () ->
         (* Retrieving values. *)
-        let values =
-          terms |> List.map snd |> S.get_term_values solver
+        let values = match terms with
+          | [] -> []
+          | _ -> terms |> List.map snd |> S.get_term_values solver
         in
         (* Running f. *)
         let whatever = f solver in
