@@ -204,10 +204,10 @@ let pp_print_model_path fmt path =
 (* Logs a test case. *)
 let log_testcase t modes model k =
   Stat.incr Stat.testgen_testcases ;
-  Format.printf "  log_testcase@." ;
+  (* Format.printf "  log_testcase@." ; *)
 
   (* |===| Logging testcase. *)
-  Format.printf "    logging testcase@." ;
+  (* Format.printf "    logging testcase@." ; *)
   let name, path, tc_file = testcase_csv t in
   let tc_fmt = fmt_of_file tc_file in
   (* Logging test case. *)
@@ -218,12 +218,12 @@ let log_testcase t modes model k =
   Unix.close tc_file ;
 
   (* |===| Updating class file. *)
-  Format.printf "    updating class file@." ;
+  (* Format.printf "    updating class file@." ; *)
   let class_fmt = fmt_of_file t.class_file in
   pp_print_tc class_fmt path name modes ;
 
   (* |===| Updating graph. *)
-  Format.printf "    updating graph@." ;
+  (* Format.printf "    updating graph@." ; *)
   let graph_fmt = fmt_of_file t.graph_file in
   pp_print_model_path graph_fmt modes ;
 
@@ -235,10 +235,10 @@ let rec log_deadlock t modes model k =
   match t.error_file with
   | None -> init_error t ; log_deadlock t modes model k
   | Some error_file ->
-    Format.printf "  log_deadlock@." ;
+    (* Format.printf "  log_deadlock@." ; *)
 
     (* |===| Logging error. *)
-    Format.printf "    logging deadlock@." ;
+    (* Format.printf "    logging deadlock@." ; *)
     let name, path, e_file = error_csv t in
     let e_fmt = fmt_of_file e_file in
     (* Logging test case. *)
@@ -249,7 +249,7 @@ let rec log_deadlock t modes model k =
     Unix.close e_file ;
 
     (* |===| Updating class file. *)
-    Format.printf "    updating error file@." ;
+    (* Format.printf "    updating error file@." ; *)
     let error_fmt = fmt_of_file error_file in
     pp_print_deadlock error_fmt path name modes ;
 
@@ -348,7 +348,7 @@ let generate_oracles sys root terms =
     N.reduce_to_coi (oracle :: subs) oracle_ident oracle_out_svs
   in
 
-  Format.printf "Writing oracle to %s@." oracle_path ;
+  (* Format.printf "Writing oracle to %s@." oracle_path ; *)
 
   let file = openfile oracle_path in
 

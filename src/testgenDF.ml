@@ -36,6 +36,12 @@ let io_ref = ref None
 (* Number of restarts performed. *)
 let restart_count_ref = ref 0
 
+(* Communicate testcase count every 50 testcases generated. *)
+let delta_tc_comm = 50
+let next_tc_comm = ref delta_tc_comm
+
+let log_id = "[TESTGEN] "
+
 (* Output statistics *)
 let print_stats () = Event.stat [
   Stat.misc_stats_title, Stat.misc_stats ;
@@ -64,19 +70,19 @@ let active_modes_of_map map =
   List.fold_left (fun (act,deact) (m,v) ->
     if v == Term.t_true then m :: act, deact else act, m :: deact
   ) ([],[]) map
-  |> fun (act,deact) ->
+  (* |> fun (act,deact) ->
     Format.printf "  active: @[<v>%a@]@."
       (pp_print_list Format.pp_print_string "@,") act ;
-    act, deact
+    act, deact *)
 
 type result = Ok | Deadlock
 
 let rec enumerate io solver tree modes contract_term =
-  Format.printf "@.enumerate@." ;
+  (* Format.printf "@.enumerate@." ; *)
   Stat.start_timer Stat.testgen_enumerate_time ;
   Solver.comment solver "enumerate" ;
   let rec loop () =
-    Format.printf "  tree: %a@." Tree.pp_print_tree tree ;
+    (* Format.printf "  tree: %a@." Tree.pp_print_tree tree ; *)
     let k = Tree.depth_of tree in
     let modes = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
     let contract_term = Term.bump_state k contract_term in
@@ -96,9 +102,9 @@ let rec enumerate io solver tree modes contract_term =
 
   (* Let's find the first mode we can activate @k+1. *)
 
-  Format.printf "  tree: %a@." Tree.pp_print_tree tree ;
+  (* Format.printf "  tree: %a@." Tree.pp_print_tree tree ; *)
   let k = Tree.depth_of tree |> Num.succ in
-  Format.printf "  at %a@." Num.pp_print_numeral k ;
+  (* Format.printf "  at %a@." Num.pp_print_numeral k ; *)
   let modes' = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
   let contract_term' = Term.bump_state k contract_term in
   let mode_path = Tree.path_of tree in
@@ -114,7 +120,7 @@ let rec enumerate io solver tree modes contract_term =
       loop ()
     | None ->
       (* If we get unsat right away then it's a deadlock. *)
-      Format.printf "  deadlock@." ;
+      (* Format.printf "  deadlock@." ; *)
       let k = Num.pred k in
       ( match Solver.checksat solver k mode_path [] [] get_model with
         | None -> assert false
@@ -132,7 +138,7 @@ and forward io solver tree modes contract_term =
   (* Resetting if too many fresh actlits have been created. *)
   let solver = if Actlit.fresh_actlit_count () >= 500 then (
       Stat.incr Stat.testgen_restarts ;
-      Format.printf "|===| Restarting solver.@." ;
+      Event.log L_info "%sRestarting solver." log_id ;
       Actlit.reset_fresh_actlit () ;
       let solver = Solver.restart solver in
       solver_ref := Some solver ;
@@ -140,15 +146,15 @@ and forward io solver tree modes contract_term =
       solver
     ) else solver
   in
-  Format.printf "@.forward@." ;
+  (* Format.printf "@.forward@." ; *)
   Solver.comment solver "forward" ;
   let rec loop () =
-    Format.printf "  tree: %a@." Tree.pp_print_tree tree ;
+    (* Format.printf "  tree: %a@." Tree.pp_print_tree tree ; *)
     let k = Tree.depth_of tree |> Num.succ in
 
     if Flags.testgen_len () > Num.to_int k then (
       (* We haven't reached the max depth yet, keep going forward. *)
-      Format.printf "  at %a@." Num.pp_print_numeral k ;
+      (* Format.printf "  at %a@." Num.pp_print_numeral k ; *)
       let modes = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
       let contract_term = Term.bump_state k contract_term in
       let mode_path = Tree.path_of tree in
@@ -161,7 +167,8 @@ and forward io solver tree modes contract_term =
         loop ()
       | None ->
         (* Deadlock. *)
-        Format.printf "  deadlock@." ;
+        Event.log
+          L_info "%sDeadlock found (%a)" log_id Tree.pp_print_tree tree ;
         let k = Num.pred k in
         ( match Solver.checksat solver k mode_path [] [] get_model with
           | None -> assert false
@@ -171,9 +178,10 @@ and forward io solver tree modes contract_term =
         Deadlock
     ) else Ok
   in
+  let result = loop () in
   Stat.record_time Stat.testgen_forward_time ;
   (* Going forward. *)
-  match loop () with
+  match result with
   | Ok ->
     (* Max depth reached, enumerate reachable modes. *)
     enumerate io solver tree modes contract_term
@@ -184,12 +192,12 @@ and forward io solver tree modes contract_term =
 and backward io solver tree modes contract_term =
   Stat.update_time Stat.testgen_total_time ;
   Stat.start_timer Stat.testgen_backward_time ;
-  Format.printf "@.backward@." ;
+  (* Format.printf "@.backward@." ; *)
   Solver.comment solver "backward" ;
-  Format.printf "  tree: %a@." Tree.pp_print_tree tree ;
+  (* Format.printf "  tree: %a@." Tree.pp_print_tree tree ; *)
   let rec loop () =
     Tree.pop tree ;
-    Format.printf "  popped tree: %a@." Tree.pp_print_tree tree ;
+    (* Format.printf "  popped tree: %a@." Tree.pp_print_tree tree ; *)
     let k = Tree.depth_of tree in
     let modes = modes |> List.map (fun (n,t) -> n, Term.bump_state k t) in
     let contract_term = Term.bump_state k contract_term in
@@ -208,15 +216,25 @@ and backward io solver tree modes contract_term =
   (* Going backwards. *)
   loop () ;
   Stat.record_time Stat.testgen_backward_time ;
+  let tc_count = IO.testcase_count io in
+  if tc_count >= !next_tc_comm then (
+    next_tc_comm := tc_count + delta_tc_comm ;
+    Event.log L_info "%s%d testcases generated." log_id tc_count
+  ) ;
   (* Found a different path, going forward now. *)
   forward io solver tree modes contract_term
 
 
 (* Entry point. *)
 let main sys =
-
-  (* Starting the timer. *)
-  Stat.start_timer Stat.testgen_total_time ;
+  Event.log L_info
+    "%s@[<v>Launching on %a.@ abstracted subsystems: [%a]@]"
+    log_id
+    TransSys.pp_print_trans_sys_name sys
+    (pp_print_list
+      (pp_print_list Format.pp_print_string "_")
+      ", ")
+    (TransSys.get_abstraction sys) ;
 
   (* Creating solver. *)
   let solver = Solver.mk sys in
@@ -230,7 +248,7 @@ let main sys =
   in
   IO.mk_dir root ;
 
-  Format.printf "generating oracle@." ;
+  Event.log L_info "%sGenerating oracle." log_id ;
   (* |===| Begin messy temporary stuff to generate outputs for each mode. *)
   let nodes = match TransSys.get_source sys with
     | TransSys.Lustre nodes -> nodes
@@ -310,8 +328,9 @@ let main sys =
     ) ([],[])
   in
 
-  Format.printf
-    "globals: @[<v>%a@]@.modes: @[<v>%a@]@."
+  Event.log L_info
+    "%s@[<v>globals: @[<v>%a@]@ modes: @[<v>%a@]@]"
+    log_id
     (pp_print_list (fun ppf (n,t) ->
         Format.fprintf ppf "%s -> %a" n Term.pp_print_term t
       ) "@,"
@@ -328,7 +347,7 @@ let main sys =
     (mode_terms |> Term.mk_or) :: global_terms |> Term.mk_and
   in
 
-  Format.printf "checking init@." ;
+  Event.log L_info "%sChecking init." log_id;
 
   let init_modes =
     match
@@ -343,22 +362,18 @@ let main sys =
     Tree.mk (fun name -> List.assoc name modes) init_modes
   in
 
-  Format.printf "depth is %a@." Num.pp_print_numeral (Tree.depth_of tree) ;
-
   (* Starting the timer. *)
   Stat.start_timer Stat.testgen_total_time ;
 
   ( try forward io solver tree modes mode_term with
-    | TestgenTree.TopReached -> Format.printf "done@." ) ;
-  Stat.record_time Stat.testgen_total_time ;
-
-  Format.printf "Tree: %a@." Tree.pp_print_tree tree ;
-
-  Format.printf "@.|===| %d restarts@." !restart_count_ref ;
-
-  Format.printf "@.|===| %d testcases generated@." (IO.testcase_count io) ;
-
-  Format.printf "@.|===| %d deadlocks found@.@." (IO.error_count io) ;
+    | TestgenTree.TopReached ->
+      Stat.get Stat.testgen_testcases
+      |> Event.log L_info "%sDone, %d testcases generated." log_id ;
+      ( match Stat.get Stat.testgen_deadlocks with
+        | 0 -> ()
+        | n -> Event.log L_warn "%s/!\\ %d deadlocks found /!\\" log_id n) ) ;
+  Stat.testgen_stop_timers () ;
+  Stat.smt_stop_timers () ;
 
   ()
 

@@ -381,38 +381,31 @@ returns
 --@ensure  LPFS or RPFS ;
 --@ensure SinceGTOrZero(Rise(TS), 1) => LPFS = not RPFS;
 
---@contract : inhibited_R2_R3 ;
---@require false -> SinceLENotZero(Fall(true -> pre LPFS) or Fall(false -> pre RPFS), inhibit_count_max) ;
+--@contract : inhibited_R2_R3_rise ;
+--@require Rise(TS) ;
+--@require SinceLENotZero(Fall(true -> pre LPFS) or Fall(false -> pre RPFS), inhibit_count_max) ;
+--@ensure  (not (Changed(RPFS) or Changed(LPFS))) ;
+
+--@contract : inhibited_R2_R3_nop ;
+--@require not Rise(TS) ;
+--@require SinceLENotZero(Fall(true -> pre LPFS) or Fall(false -> pre RPFS), inhibit_count_max) ;
 --@ensure  (not (Changed(RPFS) or Changed(LPFS))) ;
 
 --@contract : unchanged_nop_R5 ;
---@require SinceGTOrZero(Rise(TS), 2) ;
+-- --@require SinceGTOrZero(Rise(TS), inhibit_count_max) ;
+--@require not Rise(TS) ;
+--@require SinceGTOrZero(Rise(true -> pre LPFS) or Rise(false -> pre RPFS), 
+inhibit_count_max) ;
 --@ensure  (not (Changed(RPFS) or Changed(LPFS))) ;
 
-
---@contract : change_R3_Rise;
-
--- TS rised less_eq than all_ticked_max (7) steps ago.
+--@contract : change_R3_Rise ;
 --@require Rise(TS) ;
-
--- The last fall of a PFS had enough time to leave its inhibited state before
--- the rise, or did not happen.
---@require SinceGTOrZero(Fall(true -> pre RPFS) or Fall(false -> pre LPFS), 
+--@require SinceGTOrZero(Fall(true -> pre LPFS) or Fall(false -> pre RPFS), 
 inhibit_count_max) ;
-
--- As soon as the rise has had enough time to be taken into account, there
--- should have been one and exactly one rise during that time.
 --@ensure  Rise(RPFS) or Rise(LPFS) and not (Rise(RPFS) and Rise(LPFS)) ;
 
-
-
---@contract : change_R3_Fall;
-
--- One side rised.
+--@contract : change_R3_Fall ;
 --@require Since(Rise(true -> pre LPFS) or Rise(false -> pre RPFS)) = 1 ;
-
--- If enough time after this event has passed, then there should have been one
--- and only one fall during that event
 --@ensure Fall(RPFS) or Fall(LPFS) and not (Fall(RPFS) and Fall(LPFS)) ;
 
 

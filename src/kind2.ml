@@ -810,13 +810,6 @@ let main () =
       Event.set_module `TESTGEN ;
       (* Building abstraction. *)
       Refiner.set_first_abstraction trans_sys ;
-      Format.printf
-        "Launching test generation on %a.@,  abstraction: [%a]@."
-        TransSys.pp_print_trans_sys_name trans_sys
-        (pp_print_list
-          (pp_print_list Format.pp_print_string "_")
-          ", ")
-        (TransSys.get_abstraction trans_sys) ;
       (* Launching test generation. *)
       TestGen.main trans_sys ;
       (* Done. *)

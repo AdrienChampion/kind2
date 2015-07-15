@@ -57,7 +57,7 @@ let println = Format.printf "| %s@."
 
 (* Creates a new solver wrapper. The first actlit activates init@0. *)
 let mk sys =
-  println "creating solver" ;
+  (* println "creating solver" ; *)
   (* Creating solver. *)
   let solver =
     S.create_instance
@@ -67,7 +67,7 @@ let mk sys =
       (Sys.get_abstraction sys)
       (Flags.smtsolver ())
   in
-  println "declaring vars@0" ;
+  (* println "declaring vars@0" ; *)
   (* Declaring variables at 0. *)
   TransSys.init_solver
     sys
@@ -82,12 +82,12 @@ let mk sys =
     S.declare_fun solver fresh ;
     term_of_actlit fresh
   in
-  println "conditional init" ;
+  (* println "conditional init" ; *)
   (* Asserting init conditionally. *)
   Term.mk_implies [ actlit ; Sys.init_of_bound sys zero ]
   |> S.assert_term solver ;
 
-  println "done" ;
+  (* println "done" ; *)
 
   { sys ; solver ; actlits = [ actlit ] }
 
