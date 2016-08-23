@@ -164,6 +164,9 @@ val timeout_wall : unit -> float
 (** Translation to sygus. *)
 val sygus : unit -> string option
 
+(** Translation to sygus. *)
+val vmt : unit -> string option
+
 (** The Kind modules enabled is a list of [kind_module]s. *)
 type enable = Lib.kind_module list
 

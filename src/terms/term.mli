@@ -413,6 +413,10 @@ val indexes_and_var_of_select : t -> Var.t * t list
 (** Pretty-print a term *)
 val pp_print_term : Format.formatter -> t -> unit
 
+(** Pretty-print a term with a custom variable formatter. *)
+val pp_print_term_cstm :
+  (Format.formatter -> Var.t -> unit) -> Format.formatter -> t -> unit
+
 (** Pretty-print a term to the standard formatter *)
 val print_term : t -> unit
 

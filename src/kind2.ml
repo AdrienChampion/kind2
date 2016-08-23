@@ -905,11 +905,25 @@ let launch input_sys =
               file (Printexc.to_string e) ;
             exit 2
         ) ;
-        Event.log L_info "  running sed..." ;
-        ( try SysToSygus.sed_file file
+        Event.log_uncond "done" ;
+        exit 0
+    )
+  ) ;
+
+  ( match Flags.vmt () with
+    | None -> ()
+    | Some file -> (
+        Event.log_uncond "Translating problem to vmt..." ;
+        Event.log L_info "  opening file \"%s\"..." file ;
+        ( try
+            let out_channel = open_out file in
+            let fmt = Format.formatter_of_out_channel out_channel in
+            Event.log L_info "  translating..." ;
+            SysToVmt.fmt_sys_vmt fmt trans_sys ;
+            close_out out_channel ;
           with e ->
             Event.log L_fatal
-              "Could not run sed on file \"%s\":@ %s"
+              "Could not open file \"%s\" for translation to vmt format:@ %s"
               file (Printexc.to_string e) ;
             exit 2
         ) ;

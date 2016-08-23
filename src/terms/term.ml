@@ -400,6 +400,10 @@ module TermMap = Map.Make (T)
 (* Pretty-print a term *)
 let pp_print_term ppf t = T.pp_print_term ppf t
 
+(** Pretty-print a term with a custom variable formatter. *)
+let pp_print_term_cstm pp_print_var ppf t =
+  T.pp_print_term_w (fun ?arity -> Symbol.pp_print_symbol) pp_print_var ppf t
+
 (* Pretty-print a hashconsed term to the standard formatter *)
 let print_term t = pp_print_term Format.std_formatter t
 

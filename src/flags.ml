@@ -1816,11 +1816,11 @@ module Global = struct
   let timeout_wall () = !timeout_wall
 
 
-  (* Timeout. *)
+  (* Translation to sygus. *)
   let sygus_default = None
   let sygus = ref sygus_default
   let _ = add_spec
-    "--sygus"
+    "--to_sygus"
     (Arg.String (fun str -> sygus := Some str))
     (fun fmt ->
       Format.fprintf fmt
@@ -1830,6 +1830,22 @@ module Global = struct
         "
     )
   let sygus () = !sygus
+
+
+  (* Translation to sygus. *)
+  let vmt_default = None
+  let vmt = ref vmt_default
+  let _ = add_spec
+    "--to_vmt"
+    (Arg.String (fun str -> vmt := Some str))
+    (fun fmt ->
+      Format.fprintf fmt
+        "\
+          Converts the input verification problem to VMT-LIB format in the@ \
+          file provided as argument
+        "
+    )
+  let vmt () = !vmt
 
 
   (* Modules enabled. *)
@@ -2175,6 +2191,7 @@ let log_format_xml = Global.log_format_xml
 let input_format = Global.input_format
 let timeout_wall = Global.timeout_wall
 let sygus = Global.sygus
+let vmt = Global.vmt
 let input_file = Global.input_file
 let all_input_files = Global.get_all_input_files
 let clear_input_files = Global.clear_input_files
