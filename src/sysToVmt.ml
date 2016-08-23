@@ -127,11 +127,24 @@ let fmt_instances fmt (sys, instances) =
   |> Format.fprintf fmt "@[<v>%a@]"
     (pp_print_list fmt_instance "@ ")
 
+let props_of_sys sys =
+  let name = name_of_sys sys in
+  Sys.props_list_of_bound sys zero
+  |> List.fold_left (
+    fun (cnt, acc) (_, prop_term) ->
+      let prop_name =
+        Format.sprintf "%s_prop_%d" name cnt
+      in
+      cnt + 1, (prop_name, prop_term) :: acc
+  ) (1, [])
+  |> snd
+  |> List.rev
+
 let fmt_sys fmt sys =
   let consts, svars = Sys.state_vars sys |> List.partition SVar.is_const in
   let init = Sys.init_of_bound sys zero |> clean_predicate in
   let trans = Sys.trans_of_bound sys one |> clean_predicate in
-  let props = Sys.props_list_of_bound sys zero in
+  let props = props_of_sys sys in
   let name = name_of_sys sys in
 
   ( match consts with
@@ -195,7 +208,13 @@ let fmt_sys_vmt fmt sys =
   sys |> Sys.iter_subsystems (
     Format.fprintf fmt "%a@.@." fmt_sys
   ) ;
-  Format.fprintf fmt "@.@."
+  Format.fprintf fmt "@.@." ;
+
+  (* Verify query. *)
+  let props = props_of_sys sys |> List.map fst in
+  let name = name_of_sys sys in
+  Format.fprintf fmt "(verify@.  %s (@.    @[<v>%a@]@.  )@.)@.@."
+    name (pp_print_list Format.pp_print_string "@ ") props
 
   (* (** Declaring subsystems. *)
   Event.log L_info "  declaring subsystems..." ;
