@@ -888,6 +888,36 @@ let launch input_sys =
     InputSystem.trans_sys_of_analysis in_sys aparam
   in
 
+  ( match Flags.sygus () with
+    | None -> ()
+    | Some file -> (
+        Event.log_uncond "Translating problem to sygus..." ;
+        Event.log L_info "  opening file \"%s\"..." file ;
+        ( try
+            let out_channel = open_out file in
+            let fmt = Format.formatter_of_out_channel out_channel in
+            Event.log L_info "  translating..." ;
+            SysToSygus.fmt_sys_sygus fmt trans_sys ;
+            close_out out_channel ;
+          with e ->
+            Event.log L_fatal
+              "Could not open file \"%s\" for translation to sygus format:@ %s"
+              file (Printexc.to_string e) ;
+            exit 2
+        ) ;
+        Event.log L_info "  running sed..." ;
+        ( try SysToSygus.sed_file file
+          with e ->
+            Event.log L_fatal
+              "Could not run sed on file \"%s\":@ %s"
+              file (Printexc.to_string e) ;
+            exit 2
+        ) ;
+        Event.log_uncond "done" ;
+        exit 0
+    )
+  ) ;
+
   (* Memorizing things. *)
   cur_input_sys := Some (Input input_sys_sliced) ;
   cur_aparam    := Some aparam ;
@@ -1051,9 +1081,11 @@ let main () =
       LustreContractGen.generate_contracts
         input_sys_sliced trans_sys param node_of_scope target
 
-    ) else
+    ) else (
 
       launch input_sys
+
+    )
   )
 
 ;;

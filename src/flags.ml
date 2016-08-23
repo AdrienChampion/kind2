@@ -1816,6 +1816,22 @@ module Global = struct
   let timeout_wall () = !timeout_wall
 
 
+  (* Timeout. *)
+  let sygus_default = None
+  let sygus = ref sygus_default
+  let _ = add_spec
+    "--sygus"
+    (Arg.String (fun str -> sygus := Some str))
+    (fun fmt ->
+      Format.fprintf fmt
+        "\
+          Converts the input verification problem to sygus format in the file@ \
+          provided as argument
+        "
+    )
+  let sygus () = !sygus
+
+
   (* Modules enabled. *)
   type enable = kind_module list
   let kind_module_of_string = function
@@ -2158,6 +2174,7 @@ let log_level = Global.log_level
 let log_format_xml = Global.log_format_xml
 let input_format = Global.input_format
 let timeout_wall = Global.timeout_wall
+let sygus = Global.sygus
 let input_file = Global.input_file
 let all_input_files = Global.get_all_input_files
 let clear_input_files = Global.clear_input_files
