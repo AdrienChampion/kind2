@@ -38,7 +38,7 @@ let fmt_var fmt var =
     in
     let off =
       if Num.(off = zero) then "" else
-      if Num.(off = one)  then "'" else
+      if Num.(off = one)  then "!" else
         Format.asprintf "unexpected offset %a in variable %a"
           Num.pp_print_numeral off Var.pp_print_var var
     in
@@ -47,6 +47,7 @@ let fmt_var fmt var =
     Var.pp_print_var fmt var
   )
 let fmt_term = Term.pp_print_term_cstm fmt_var
+let fmt_term_vanilla = Term.pp_print_term
 let fmt_type = Type.pp_print_type
 let fmt_list = pp_print_list
 
@@ -136,7 +137,8 @@ let fmt_sys_sygus fmt sys =
     if int || real then
       Format.fprintf fmt "(set-logic L%s%sA)@.@."
         (if int then "I" else "") (if real then "R" else "")
-    else ()
+    else
+      Format.fprintf fmt "(set-logic SAT)@.@."
   in
 
   (** Declaring subsystems. *)
@@ -162,7 +164,7 @@ let fmt_sys_sygus fmt sys =
           )
           "@ "
         ) vars
-        fmt_term term ;
+        fmt_term_vanilla term ;
       Format.fprintf fmt "@."
   ) ;
   Format.fprintf fmt "@.@." ;
