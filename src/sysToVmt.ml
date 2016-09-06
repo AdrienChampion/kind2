@@ -41,7 +41,7 @@ let fmt_var fmt var =
     in
     let pref =
       if Num.(off = zero) then "curr" else
-      if Num.(off = one)  then "succ" else
+      if Num.(off = one)  then "next" else
         Format.asprintf "unexpected offset %a in variable %a"
           Num.pp_print_numeral off Var.pp_print_var var
     in
@@ -58,11 +58,57 @@ let init_name = "init"
 let trans_name = "trans"
 let prop_name = "prop"
 
+
+let rm_none =
+  let rec filter_map pref = function
+    | None :: tail -> filter_map pref tail
+    | (Some kid) :: tail -> filter_map (kid :: pref) tail
+    | _ -> List.rev pref
+  in
+  filter_map []
+
 (** Removes all node calls from the first level of a conjunction.
 
 Leaves the term untouched if it's not a conjunction. *)
 let clean_predicate term =
-  try (
+  let term =
+    Term.eval_t (
+      fun flat kids ->
+        let kids = rm_none kids in
+        match flat with
+        | Term.T.App ( sym, subs ) -> (
+          match Symbol.node_of_symbol sym with
+          (* Node call. *)
+          | `UF _ -> None
+          (* This function only changes the boolean structure of the term.
+          Hence the only special treatment is on bool operators. *)
+          | `AND -> Some (
+            match kids with
+            | [] -> Term.t_true
+            | _ -> Term.mk_and kids
+          )
+          | `OR -> Some (
+            match kids with
+            | [] -> Term.t_true
+            | _ -> Term.mk_or kids
+          )
+          (* Other operators, should not change. *)
+          | _ -> Some (
+            assert ( List.length subs = List.length kids ) ;
+            Term.mk_app sym kids
+          )
+        )
+        | Term.T.Var _
+        | Term.T.Const _ -> Some (
+          Term.construct flat
+        )
+        | Term.T.Attr (_, attr) -> failwith "term attributes not supported"
+    ) term
+  in
+  match term with
+  | None -> Term.t_true
+  | Some t -> t
+(*   try (
     match (
       Term.node_symbol_of_term term |> Symbol.node_of_symbol,
       Term.node_args_of_term term
@@ -87,7 +133,7 @@ let clean_predicate term =
     | _ -> term
   ) with
   (** Not a conjunction. *)
-  | invalid_arg -> term
+  | invalid_arg -> term *)
 
 let svar_at k svar = Var.mk_state_var_instance svar k |> Term.mk_var
 
@@ -119,7 +165,10 @@ let fmt_instance fmt (sys, { Sys.pos ; Sys.map_up }) =
   in
   Format.fprintf fmt "(%s %a)"
     name
-    (pp_print_list fmt_svar " ") actual
+    (pp_print_list
+      (fun fmt -> Format.fprintf fmt "(_ curr %a)" fmt_svar)
+      " "
+    ) actual
 
 let fmt_instances fmt (sys, instances) =
   instances
