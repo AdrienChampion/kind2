@@ -63,6 +63,11 @@ let fmt_svar_as_arg n fmt svar =
   let var = Var.mk_state_var_instance svar n |> Term.mk_var in
   Format.fprintf fmt "(%a %a)" fmt_term var fmt_type typ
 
+let fmt_svar_as_dec_fun n fmt svar =
+  let typ = SVar.type_of_state_var svar in
+  let var = Var.mk_state_var_instance svar n |> Term.mk_var in
+  Format.fprintf fmt "(declare-fun %a () %a)" fmt_term var fmt_type typ
+
 let synth_inv fmt svars =
   Format.fprintf fmt
     "@[<v>(synth-inv %s(@   @[<v>%a@]@ ))@.@]"
@@ -171,7 +176,7 @@ let fmt_sys_sygus fmt sys =
 
   (** Declaring invariant to synthesize. *)
   Event.log L_info "  declaring invariant..." ;
-  Format.fprintf fmt "%a@." synth_inv all_svars ;
+  Format.fprintf fmt "%a@." synth_inv svars ;
 
   (** Declaring constants. *)
   Event.log L_info "  declaring constants..." ;
@@ -179,7 +184,7 @@ let fmt_sys_sygus fmt sys =
     fun svar ->
       let typ = SVar.type_of_state_var svar in
       Format.fprintf fmt
-        "(declare-var %a %a)@." fmt_svar svar fmt_type typ
+        "(declare-fun %a () %a)@." fmt_svar svar fmt_type typ
   ) ;
   Format.fprintf fmt "@." ;
 
@@ -203,7 +208,7 @@ let fmt_sys_sygus fmt sys =
       )\
     @]@.@."
     init_name
-    (fmt_list (fmt_svar_as_arg zero) "@ ") all_svars
+    (fmt_list (fmt_svar_as_arg zero) "@ ") svars
     fmt_term init ;
 
   (** Declaring transition relation. *)
@@ -213,9 +218,6 @@ let fmt_sys_sygus fmt sys =
       (define-fun@   \
         @[<v>%s (@   \
           @[<v>\
-            @ \
-            ;; Constants.@ \
-            %a@ \
             @ \
             ;; Current state.@ \
             %a@ \
@@ -229,7 +231,6 @@ let fmt_sys_sygus fmt sys =
       )\
     @]@.@."
     trans_name
-    (fmt_list (fmt_svar_as_arg zero) "@ ") consts
     (fmt_list (fmt_svar_as_arg zero) "@ ") svars
     (fmt_list (fmt_svar_as_arg one) "@ ") svars
     fmt_term trans ;
@@ -249,7 +250,7 @@ let fmt_sys_sygus fmt sys =
       )\
     @]@.@."
     prop_name
-    (fmt_list (fmt_svar_as_arg zero) "@ ") all_svars
+    (fmt_list (fmt_svar_as_arg zero) "@ ") svars
     fmt_term prop ;
 
   (** Defining "inv-constraint". *)
